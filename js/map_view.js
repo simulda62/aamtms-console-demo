@@ -10,9 +10,10 @@
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       opt: { maxZoom: 19, attribution: 'Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics, GIS User Community' },
     },
+    // 도로 지도: Esri World Street Map(키 불필요). CARTO는 공개 주소에서 API 키를 요구하여 교체함(2026-10-06).
     dark: {
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      opt: { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap contributors © CARTO' },
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      opt: { maxZoom: 19, attribution: 'Tiles © Esri — Sources: Esri, HERE, Garmin, USGS, NGA, EPA, USDA, NPS' },
     },
     grid: null,
   };

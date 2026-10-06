@@ -275,6 +275,7 @@ body[data-view="detail"] .asset, body[data-view="detail_events"] .asset { grid-t
 #map { position: absolute; inset: 0; background: #0e0e0e; }
 .leaflet-container { font: inherit; background: #0e0e0e; }
 .map--satellite .leaflet-tile-pane { filter: contrast(1.12) saturate(1.15) brightness(.95); }
+.map--dark .leaflet-tile-pane { filter: brightness(.82) saturate(.9); }
 .map--grid {
   background-color: #111 !important;
   background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
