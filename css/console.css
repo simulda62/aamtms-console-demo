@@ -545,6 +545,13 @@ body[data-view="detail"] .d-foot, body[data-view="detail_events"] .d-foot, body[
 .sched-st { font-weight: 600; white-space: nowrap; }
 .sched-st--active { color: var(--accent); }
 .sched-st--nodata { color: var(--nodata); }
+.sched-st--hold { color: #c4b5fd; }
+.tbl--sched tr.is-hold td:first-child { box-shadow: inset 3px 0 #c4b5fd; }
+.hold-box { margin-bottom: 10px; padding: 8px 10px; border: 1px dashed #8b7bd8; background: rgba(196, 181, 253, .08); font-size: 12.5px; color: var(--text-2); }
+.hold-box b { color: #c4b5fd; margin-right: 6px; }
+.hold-label { color: #c4b5fd; font-size: 11px; font-weight: 600; white-space: nowrap; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(8px, -16px); }
+.hold-label i { font-style: normal; color: var(--caution); font-weight: 400; font-size: 10px; }
+.zoom-far .hold-label { font-size: 10px; }
 .now-row td { padding: 0 !important; border-bottom: none; }
 .now-line { display: flex; align-items: center; gap: 8px; padding: 2px 10px; color: var(--accent); font: 600 11px var(--mono); letter-spacing: .06em; }
 .now-line::after { content: ""; flex: 1; height: 1px; background: var(--accent); opacity: .6; }

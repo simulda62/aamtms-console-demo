@@ -90,6 +90,12 @@
       const mid = p.ll[Math.floor(p.segCount / 2)];
       L.marker(mid, { interactive: false, icon: L.divIcon({ className: 'proc-label', html: `${p.id} <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);
     });
+    // 공중대기 공역(가상): 대기 경로와 기점
+    (M.HOLDS || []).forEach(h => {
+      L.polyline(h.pattern, { color: '#c4b5fd', weight: 1.5, opacity: 0.8, dashArray: '2 5', interactive: false }).addTo(procLayer);
+      L.circleMarker(h.ll, { radius: 3.5, color: '#c4b5fd', weight: 1.5, fillColor: '#111', fillOpacity: 1, interactive: false }).addTo(procLayer);
+      L.marker(h.ll, { interactive: false, icon: L.divIcon({ className: 'hold-label', html: `${h.id} 공중대기 <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);
+    });
     M.VERTIPORTS.forEach(v => {
       L.marker(v.ll, { interactive: false, icon: L.divIcon({ className: 'vp-icon', html: `<div class="vp">H</div><div class="vp__label">${v.name || v.id} <i>가상</i></div>`, iconSize: [20, 20], iconAnchor: [10, 10] }) }).addTo(procLayer);
     });
@@ -228,7 +234,7 @@
         const vs = r.fused.vs_fpm;
         const trend = vs > 200 ? '↑' : vs < -200 ? '↓' : '';
         root.querySelector('.mk__l2').textContent = fresh
-          ? `${Math.round(r.fused.alt_ft)} ft${trend ? ` ${trend}` : ''} · ${Math.round(r.fused.gs_kt)} kt`
+          ? `${Math.round(r.fused.alt_ft)} ft${trend ? ` ${trend}` : ''} · ${Math.round(r.fused.gs_kt)} kt${r.proc.hold ? ' · HOLD' : ''}`
           : `마지막 수신 ${F.time(r.t + 9 * 3600 * 1000, true)}`;
       }
       trails[ac.id].setLatLngs((S.trails[ac.id] || []).map(p => [p[1], p[2]]));

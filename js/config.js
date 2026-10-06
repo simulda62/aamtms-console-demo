@@ -21,6 +21,12 @@ TMS.config = {
   NETWORK_CYCLE_SEC: 1800,
   HUB_TURNAROUND_SEC: 90,
   ISLAND_MIN_TURNAROUND_SEC: 120,
+  // 공중대기: 대기 경로(경주로형) 반경·직선 길이(m), 대기 속도(kt), 회차별 공중대기 발생 확률(1바퀴/2바퀴 누적)
+  HOLD_TURN_RADIUS_M: 450,
+  HOLD_LEG_M: 1200,
+  HOLD_SPEED_KT: 70,
+  HOLD_PROB_1: 0.18,
+  HOLD_PROB_2: 0.10,
   // 지도 기준 위치(아래 TMS.LOCATION에서 정함). 가상 절차·버티포트는 이 점을 기준으로 한 상대 좌표(임의값)임.
   MAP_CENTER: null,
   MAP_ZOOM: 13,
@@ -54,6 +60,11 @@ TMS.LOCATION_PRESETS = {
         { id: 'YHD', name: '영흥도', ll: [37.25607, 126.45903] },
       ],
       destinations: ['DIJ', 'SIJ', 'SBD', 'DJD', 'YHD'],
+      // 공중대기 공역(가상): 중심 버티포트에서 방위(도)·거리(m). serves 노선은 이 공역 기점을 지나 접근하며, stack은 노선별 대기 고도(ft).
+      holds: [
+        { id: 'HOLD-W', bearing: 230, dist: 3500, serves: ['DJD', 'SIJ', 'DIJ'], stack: [900, 1200, 1500] },
+        { id: 'HOLD-E', bearing: 130, dist: 3500, serves: ['SBD', 'YHD'], stack: [900, 1200] },
+      ],
     },
   },
   jejucity:  { label: '제주시청', ll: [33.4996, 126.5312] },

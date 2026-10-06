@@ -367,7 +367,8 @@
         const fill = i === p.seg ? Math.round(p.segFrac * 100) : i < p.seg ? 100 : 0;
         return `<div class="seg-step seg-step--${cls}"><span>S${i + 1}</span><div class="seg-step__bar"><div style="width:${fill}%"></div></div></div>`;
       }).join('');
-      q('proc').innerHTML = `<div class="proc-title"><b class="mono">${p.id}</b> v${p.ver} · ${p.kind} · ${p.vp} <em class="tag tag--virtual">가상 예시 절차</em></div>
+      const hold = p.hold ? `<div class="hold-box"><b>공중대기 ${p.hold.fix}</b> ${p.hold.lap}/${p.hold.laps}바퀴 · 예상 접근 시각 <span class="mono">${kst(p.hold.until)}</span> KST (${ago(Math.max(0, p.hold.until - S.now))} 후)</div>` : '';
+      q('proc').innerHTML = `${hold}<div class="proc-title"><b class="mono">${p.id}</b> v${p.ver} · ${p.kind} · ${M.vpName(p.vp)} <em class="tag tag--virtual">가상 예시 절차</em></div>
         <div class="seg-steps">${segs}</div><p class="hint">현재 구간은 판정 엔진이 절차의 전환 기준으로 판별한 결과임.</p>`;
     } else q('proc').innerHTML = r && fresh ? `<p>${r.proc.label}</p>` : '<p class="muted">정보 없음</p>';
 
@@ -491,6 +492,11 @@
 
     const arrState = r => {
       if (now >= r.tEvent) return { k: 'past', label: '착륙' };
+      if (r.hold && now >= r.hold.start && now < r.hold.end) {
+        if (nodata(r.ac)) return { k: 'nodata', label: '정보 없음' };
+        const lap = Math.min(r.hold.laps, Math.floor((now - r.hold.start) / r.hold.lapMs) + 1);
+        return { k: 'hold', label: `공중대기 ${r.hold.fix} (${lap}/${r.hold.laps}바퀴)` };
+      }
       if (now >= r.tStart) return nodata(r.ac) ? { k: 'nodata', label: '정보 없음' } : { k: 'active', label: `접근 중${segOf(r.ac, r.proc)}` };
       return { k: 'future', label: '예정' };
     };
@@ -517,7 +523,7 @@
           <td>${M.vpName(r[placeKey])}</td>
           <td class="mono">${r.proc}</td>
           <td><span class="sched-st sched-st--${s.k}">${s.label}</span></td>
-          <td>${s.k === 'active' || s.k === 'nodata' ? stTag(st) : '<span class="muted">—</span>'}</td></tr>`;
+          <td>${s.k === 'active' || s.k === 'hold' || s.k === 'nodata' ? stTag(st) : '<span class="muted">—</span>'}</td></tr>`;
       });
       if (!lined) html += `<tr class="now-row"><td colspan="7"><div class="now-line">현재 ${kst(now)}</div></td></tr>`;
       return `${html}</tbody></table>`;
@@ -535,6 +541,7 @@
       ['다음 출항', nextDep ? `${nextDep.ac} ${hm(nextDep.tEvent)}` : '—'],
       ['패드 대기', `${atPad}`],
       ['접근 중', `${approaching}`],
+      ['공중대기', `${arrivals.filter(r => arrState(r).k === 'hold').length}`],
       ['다음 입항', nextArr ? `${nextArr.ac} ${hm(nextArr.tEvent)}` : '—'],
     ]);
   }

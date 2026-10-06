@@ -78,6 +78,37 @@
   }
 
   let VERTIPORTS, PROCS, LOOPS;
+  let HOLDS = [];
+  // 공중대기 경로(경주로형, 오른쪽 선회). 기점 F에서 접근 방향 u로 들어와 선회 → 바깥 직선 → 선회 → 안쪽 직선으로 F에 돌아옴.
+  const HR = C.HOLD_TURN_RADIUS_M, HL = C.HOLD_LEG_M;
+  const HOLD_LAP_M = 2 * Math.PI * HR + 2 * HL;
+  const HOLD_V = C.HOLD_SPEED_KT * KT;
+  const HOLD_LAP_SEC = HOLD_LAP_M / HOLD_V;
+  function holdPos(h, s) {
+    s = ((s % HOLD_LAP_M) + HOLD_LAP_M) % HOLD_LAP_M;
+    const u = [h.ux, h.uy], r = [h.uy, -h.ux], F = [h.e, h.n];
+    const C1 = [F[0] + HR * r[0], F[1] + HR * r[1]];
+    const arc = Math.PI * HR;
+    const pt = (x, y, dx, dy) => ({ e: x, n: y, hdg: (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360 });
+    if (s < arc) {
+      const p = s / HR;
+      return pt(C1[0] + HR * (-r[0] * Math.cos(p) + u[0] * Math.sin(p)), C1[1] + HR * (-r[1] * Math.cos(p) + u[1] * Math.sin(p)),
+        r[0] * Math.sin(p) + u[0] * Math.cos(p), r[1] * Math.sin(p) + u[1] * Math.cos(p));
+    }
+    s -= arc;
+    const P2 = [F[0] + 2 * HR * r[0], F[1] + 2 * HR * r[1]];
+    if (s < HL) return pt(P2[0] - u[0] * s, P2[1] - u[1] * s, -u[0], -u[1]);
+    s -= HL;
+    const C2 = [C1[0] - u[0] * HL, C1[1] - u[1] * HL];
+    if (s < arc) {
+      const p = s / HR;
+      return pt(C2[0] + HR * (r[0] * Math.cos(p) - u[0] * Math.sin(p)), C2[1] + HR * (r[1] * Math.cos(p) - u[1] * Math.sin(p)),
+        -r[0] * Math.sin(p) - u[0] * Math.cos(p), -r[1] * Math.sin(p) - u[1] * Math.cos(p));
+    }
+    s -= arc;
+    const P4 = [F[0] - u[0] * HL, F[1] - u[1] * HL];
+    return pt(P4[0] + u[0] * s, P4[1] + u[1] * s, u[0], u[1]);
+  }
   const NET = TMS.LOCATION && TMS.LOCATION.network;
   if (NET) {
     // 기준 위치에 정의된 노선망(가상): 중심 버티포트와 주변 섬 버티포트 간 왕복 노선
@@ -88,14 +119,35 @@
     const vp = Object.fromEntries(VERTIPORTS.map(v => [v.id, v]));
     PROCS = [];
     // 한 방향 노선: 출발 절차(2구간) + 접근 절차(3구간). 진행 방향 오른쪽으로 250m 띄워 왕복 경로가 겹치지 않게 함.
+    // 공중대기 공역: 중심 버티포트 기준 방위·거리로 기점을 두고, 접근 방향(기점→중심)을 대기 경로의 안쪽 방향으로 씀
+    const hubV = vp[NET.hub];
+    HOLDS = (NET.holds || []).map(h => {
+      const b = h.bearing * Math.PI / 180;
+      const e = hubV.e + Math.sin(b) * h.dist, n = hubV.n + Math.cos(b) * h.dist;
+      const L = Math.hypot(hubV.e - e, hubV.n - n);
+      const hold = { id: h.id, serves: h.serves, stack: h.stack, e, n, ux: (hubV.e - e) / L, uy: (hubV.n - n) / L, ll: toLL(e, n) };
+      const pts = [];
+      for (let s = 0; s <= HOLD_LAP_M; s += 100) { const q = holdPos(hold, s); pts.push(toLL(q.e, q.n)); }
+      hold.pattern = pts;
+      return hold;
+    });
+    const holdFor = d => HOLDS.find(h => h.serves.includes(d));
     const leg = (a, b) => {
       const A = vp[a], B = vp[b];
       const L = Math.hypot(B.e - A.e, B.n - A.n), ux = (B.e - A.e) / L, uy = (B.n - A.n) / L;
       const at = (d, off) => [A.e + ux * d + uy * off, A.n + uy * d - ux * off];
       const dep = mkProc({ id: `DEP-${a}-${b}`, ver: '0.1', kind: '출발', vp: a,
         pts: [[A.e, A.n, 0], [...at(1200, 250), 500], [...at(L * 0.5, 250), 1500]] });
-      const arr = mkProc({ id: `ARR-${a}-${b}`, ver: '0.1', kind: '접근', vp: b,
-        pts: [[...at(L * 0.5, 250), 1500], [...at(L - 2500, 250), 800], [...at(L - 1000, 100), 300], [B.e, B.n, 0]] });
+      const h = b === NET.hub ? holdFor(a) : null;
+      let arrPts;
+      if (h) {
+        // 중심 버티포트 접근은 공중대기 기점을 지남: 중간점 → 대기 기점(노선별 대기 고도) → 최종 접근점 → 착륙
+        const alt = h.stack[h.serves.indexOf(a)] || 1000;
+        arrPts = [[...at(L * 0.5, 250), 1500], [h.e, h.n, alt], [B.e - h.ux * 1000, B.n - h.uy * 1000, 300], [B.e, B.n, 0]];
+      } else {
+        arrPts = [[...at(L * 0.5, 250), 1500], [...at(L - 2500, 250), 800], [...at(L - 1000, 100), 300], [B.e, B.n, 0]];
+      }
+      const arr = mkProc({ id: `ARR-${a}-${b}`, ver: '0.1', kind: '접근', vp: b, pts: arrPts, hold: h ? h.id : null });
       PROCS.push(dep, arr);
       return [dep, arr];
     };
@@ -184,6 +236,75 @@
   });
   const byId = Object.fromEntries(AIRCRAFT.map(a => [a.id, a]));
 
+  // ---- 공중대기 ----
+  // 기체가 섬에서 일찍 출발해 중심 버티포트 착륙 시각보다 먼저 도착하면 대기 기점에서 공중대기 후 정해진 시각에 착륙함.
+  // 착륙 시각은 바뀌지 않으므로 이착륙 분리가 유지됨. 섬 이륙이 앞당겨지는 범위는 다른 기체와 겹치지 않게 제한함.
+  AIRCRAFT.forEach(ac => {
+    const lp = ac.loop;
+    const n = lp.nodes;
+    const fixIdx = n.findIndex(nd => nd.proc && nd.proc.hold && nd.seg === 1);
+    if (fixIdx < 0) return;
+    const island = lp.stops.find(st => st.vp !== n[fixIdx].proc.vp);
+    const fixNode = n[fixIdx];
+    ac.hold = {
+      ref: HOLDS.find(h => h.id === fixNode.proc.hold), alt: fixNode.alt, fixNode,
+      tauD: island.tArr + island.dwell, tauF: fixNode.t0, island, maxLaps: 0,
+    };
+  });
+  (function assignMaxLaps() {
+    const P = AIRCRAFT[0].loop.period;
+    const occ2 = {};
+    Object.entries(occupied).forEach(([vp, list]) => { occ2[vp] = list.map(x => ({ ...x })); });
+    AIRCRAFT.forEach(ac => {
+      if (!ac.hold) return;
+      const st = ac.hold.island;
+      const s0 = ((st.tArr + st.dwell - ac.phase) % P + P) % P;
+      const list = occ2[st.vp] || [];
+      const mine = list.find(x => x.ac === ac.id && Math.abs(x.s - s0) < 1e-6);
+      const others = list.filter(x => x !== mine);
+      for (let laps = 2; laps >= 0; laps--) {
+        const H = laps * HOLD_LAP_SEC;
+        const win = { s: ((s0 - H) % P + P) % P, d: st.toDur + H, ac: ac.id };
+        if (laps === 0 || others.every(o => !clash(win, o, P))) {
+          ac.hold.maxLaps = laps;
+          if (mine) Object.assign(mine, win);
+          break;
+        }
+      }
+    });
+  })();
+  // 회차(m)별 공중대기 바퀴 수(결정적 난수)
+  function holdLaps(ac, m) {
+    if (!ac.hold || !ac.hold.maxLaps) return 0;
+    const r = rnd(m, AC_INDEX[ac.id], 11);
+    if (r < C.HOLD_PROB_2 && ac.hold.maxLaps >= 2) return 2;
+    if (r < C.HOLD_PROB_1 + C.HOLD_PROB_2) return 1;
+    return 0;
+  }
+  // 기체 위치(공중대기 반영)
+  function routeWithHold(ac, t) {
+    const P = ac.loop.period;
+    const tau = t / 1000 + ac.phase;
+    const m = Math.floor(tau / P);
+    const x = tau - m * P;
+    const h = ac.hold;
+    const laps = h ? holdLaps(ac, m) : 0;
+    if (laps) {
+      const H = laps * HOLD_LAP_SEC;
+      if (x >= h.tauD - H && x < h.tauF - H) return routeAt(ac.loop, x + H);
+      if (x >= h.tauF - H && x < h.tauF) {
+        const el = x - (h.tauF - H);
+        const q = holdPos(h.ref, el * HOLD_V);
+        const nd = h.fixNode;
+        return {
+          e: q.e, n: q.n, alt: h.alt, gs: C.HOLD_SPEED_KT, vs: 0, hdg: q.hdg, nd, ground: false, f: 0,
+          holding: { fix: h.ref.id, lap: Math.min(laps, Math.floor(el / HOLD_LAP_SEC) + 1), laps, until: (m * P + h.tauF - ac.phase) * 1000 },
+        };
+      }
+    }
+    return routeAt(ac.loop, x);
+  }
+
   // 시연 상황(가상). 기체마다 SCENARIO_SLOT_SEC 단위로 발생 여부·종류·지속 시간·시작 시점을 무작위로 정함.
   // 시각에 대한 결정적 난수라서 여러 창·여러 사람이 같은 시각에 같은 상황을 봄.
   // [종류, 비중, 최소 지속(초), 최대 지속(초)]
@@ -230,9 +351,11 @@
   }
 
   function kin(ac, t) {
-    const r = routeAt(ac.loop, t / 1000 + ac.phase);
+    const r = routeWithHold(ac, t);
     const ev = activeEvent(ac.id, t);
-    const off = ev && ev.kind === 'lateral' ? 320 * Math.sin(Math.PI * ev.u / ev.dur) : 0;
+    // 경로 이탈 폭은 저고도(700ft 미만)에서 줄어 착륙·지상에서는 0이 됨
+    const lowFade = Math.max(0, Math.min(1, (r.alt - 700) / 400));
+    const off = ev && ev.kind === 'lateral' ? 320 * Math.sin(Math.PI * ev.u / ev.dur) * lowFade : 0;
     const e = r.e + r.nd.un * off, n = r.n - r.nd.ue * off;
     const vs = ev && ev.kind === 'descent' && !r.ground ? -1500 : r.vs;
     const gs = ev && ev.kind === 'speed' && !r.ground ? r.gs + 30 : r.gs;
@@ -321,7 +444,8 @@
     else fusion = { flag: 'ok', diff_m: 5 + 3 * Math.sin(t / 3000 + ac.phase) };
 
     let proc;
-    if (k.ground) proc = { id: null, label: `${k.nd.proc.vp} 지상 대기` };
+    if (k.holding) proc = { id: k.nd.proc.id, ver: k.nd.proc.ver, kind: '공중대기', vp: k.nd.proc.vp, seg: k.nd.seg, segCount: k.nd.proc.segCount, segFrac: 0, hold: k.holding, label: `공중대기 ${k.holding.fix} (${k.holding.lap}/${k.holding.laps}바퀴)` };
+    else if (k.ground) proc = { id: null, label: `${k.nd.proc.vp} 지상 대기` };
     else if (k.nd.proc) proc = { id: k.nd.proc.id, ver: k.nd.proc.ver, kind: k.nd.proc.kind, vp: k.nd.proc.vp, seg: k.nd.seg, segCount: k.nd.proc.segCount, segFrac: k.f, label: `${k.nd.proc.id} · S${k.nd.seg + 1}` };
     else proc = { id: null, label: '이동 구간(절차 외)' };
 
@@ -414,13 +538,22 @@
           const key = (ai * 31 + si * 7 + ((m % 97) + 97)) % DELAYS.length;
           const off = DELAYS[key] * 1000;
           const plan = t => Math.round((t - off) / 60000) * 60000;
+          // 공중대기: 중심 착륙(이 회차 시작 시각 = 직전 회차 귀환)과 섬 출발(이 회차)에 반영
+          const hd = ac.hold;
+          const isHub = hd && st.arrProc.hold;
+          const lapsArr = isHub ? holdLaps(ac, m - 1) : 0;
+          const lapsDep = hd && st === hd.island ? holdLaps(ac, m) : 0;
           if (tArr >= t0 && tArr <= t1) {
+            const H = lapsArr * HOLD_LAP_SEC * 1000;
+            const fixAt = isHub ? tArr - (P - hd.tauF) * 1000 : null;
             arrivals.push({ id: `${ac.id}@A${tArr}`, ac: ac.id, virtual: ac.virtual, vp, from: st.from, proc: st.arrProc.id,
-              plan: plan(tArr), tStart: tArr - st.appDur * 1000, tEvent: tArr });
+              plan: plan(tArr), tStart: tArr - st.appDur * 1000 - H, tEvent: tArr, landMs: st.landDur * 1000,
+              hold: lapsArr ? { fix: st.arrProc.hold, laps: lapsArr, start: fixAt - H, end: fixAt, lapMs: HOLD_LAP_SEC * 1000 } : null });
           }
-          if (tDep >= t0 && tDep <= t1) {
+          const tDepAct = tDep - lapsDep * HOLD_LAP_SEC * 1000;
+          if (tDepAct >= t0 && tDepAct <= t1) {
             departures.push({ id: `${ac.id}@D${tDep}`, ac: ac.id, virtual: ac.virtual, vp, to: st.to, proc: st.depProc.id,
-              plan: plan(tDep), tPad: tArr, tEvent: tDep, tEnd: tDep + st.depDur * 1000 });
+              plan: plan(tDep), tPad: tArr, tEvent: tDepAct, tEnd: tDepAct + st.depDur * 1000, toMs: st.toDur * 1000, early: lapsDep > 0 });
           }
         }
       });
@@ -443,5 +576,5 @@
     return out;
   }
 
-  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName, padCheck };
+  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, HOLDS, HOLD_LAP_SEC, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName, padCheck };
 })();
