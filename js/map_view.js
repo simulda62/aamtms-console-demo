@@ -60,7 +60,7 @@
           <circle class="mk__ring" r="4"/>
           <circle class="mk__dot" r="1.6"/>
         </svg>
-        <div class="mk__label"><span class="mk__id">${ac.id}</span><span class="mk__st"></span></div>
+        <div class="mk__label"><div class="mk__l1"><span class="mk__id">${ac.id}</span><span class="mk__st"></span></div><div class="mk__l2"></div></div>
       </div>`,
     });
   }
@@ -222,6 +222,12 @@
         root.className = `mk mk--${st}${ac.virtual ? ' mk--virtual' : ''}${ac.id === sel ? ' is-selected' : ''}`;
         root.querySelector('.mk__hdg').setAttribute('transform', `rotate(${r.fused.hdg})`);
         root.querySelector('.mk__st').textContent = st === 'normal' ? '' : TMS.STATUS[st].label;
+        // 간단 정보 표지: 고도·상승/하강·속도. 수신 두절 시 값 대신 마지막 수신 시각
+        const vs = r.fused.vs_fpm;
+        const trend = vs > 200 ? '↑' : vs < -200 ? '↓' : '';
+        root.querySelector('.mk__l2').textContent = fresh
+          ? `${Math.round(r.fused.alt_ft)} ft${trend ? ` ${trend}` : ''} · ${Math.round(r.fused.gs_kt)} kt`
+          : `마지막 수신 ${F.time(r.t + 9 * 3600 * 1000, true)}`;
       }
       trails[ac.id].setLatLngs((S.trails[ac.id] || []).map(p => [p[1], p[2]]));
       trails[ac.id].setStyle({ opacity: fresh ? 0.4 : 0.15 });
