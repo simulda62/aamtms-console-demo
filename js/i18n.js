@@ -79,7 +79,6 @@
     '강하율 · 경고→비상 (드묾)': 'Descent rate · Warning→Emergency (rare)',
     '예상 접근 시각': 'Expected approach',
     '공중대기': 'Holding',
-    '시': " o'clock",
     ' 후)': ' left)',
     '바퀴': ' laps',
     '대이작도': 'Daeijakdo',

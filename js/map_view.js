@@ -109,7 +109,7 @@
     });
     // 시계비행 보고점(가상): 삼각형 표식
     (M.VFR_POINTS || []).forEach(p => {
-      L.marker(p.ll, { interactive: false, icon: L.divIcon({ className: 'vrp', html: `<span class="vrp__mk"></span><span class="vrp__txt">${p.id}${p.clock ? ` · ${p.clock}시` : ''}</span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(procLayer);
+      L.marker(p.ll, { interactive: false, icon: L.divIcon({ className: 'vrp', html: `<span class="vrp__mk"></span><span class="vrp__txt">${p.id}</span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(procLayer);
     });
     (M.HOLD_AREAS || []).forEach(a => {
       L.marker(a.ll, { interactive: false, icon: L.divIcon({ className: 'hold-label', html: `${a.id} 공중대기 <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);

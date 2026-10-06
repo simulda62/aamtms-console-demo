@@ -128,7 +128,7 @@
     const V = NET.vfr;
     const H0 = [hubV.e, hubV.n];
     const polar = (bearing, dist) => { const b = bearing * Math.PI / 180; return [H0[0] + Math.sin(b) * dist, H0[1] + Math.cos(b) * dist]; };
-    VFR_POINTS = Object.entries(V.points).map(([id, p]) => { const q = polar(p.bearing, p.dist); return { id, clock: p.clock, e: q[0], n: q[1], ll: toLL(q[0], q[1]) }; });
+    VFR_POINTS = Object.entries(V.points).map(([id, p]) => { const q = polar(p.bearing, p.dist); return { id, e: q[0], n: q[1], ll: toLL(q[0], q[1]) }; });
     const pt = id => VFR_POINTS.find(x => x.id === id);
     const unit = (a, b) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
     // 출항 절차: 버티포트 → 상승 지점(1km, 500ft) → 보고점(출항 고도)
