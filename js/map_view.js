@@ -123,11 +123,9 @@
     const lp = document.getElementById('layer-panel');
     const lb = document.getElementById('btn-layers');
     if (lp && lb) {
-      // 지도 영역이 넉넉할 때만 배경·표시 패널을 펼친 상태로 시작함
-      const box = map.getContainer().getBoundingClientRect();
-      const wide = box.width >= 900 && box.height >= 560;
-      lp.classList.toggle('is-open', wide);
-      lb.classList.toggle('is-on', wide);
+      // 배경·표시 패널은 닫힌 상태로 시작하고, 배경·표시 버튼을 눌렀을 때만 엶
+      lp.classList.remove('is-open');
+      lb.classList.remove('is-on');
       lb.addEventListener('click', () => lb.classList.toggle('is-on', lp.classList.toggle('is-open')));
       on('layer-close', 'click', () => {
         lp.classList.remove('is-open');
