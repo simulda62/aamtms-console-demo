@@ -26,8 +26,6 @@
   const markers = {}, trails = {}, raws = {};
   let tileErrors = 0;
 
-  function pref(key, def) { try { return localStorage.getItem('aamtms.' + key) || def; } catch (e) { return def; } }
-  function savePref(key, v) { try { localStorage.setItem('aamtms.' + key, v); } catch (e) { /* 저장 불가 시 무시 */ } }
 
   function setBasemap(key) {
     basemap = key in BASEMAPS ? key : 'satellite';
@@ -45,7 +43,6 @@
       });
       tile.addTo(map);
     }
-    savePref('basemap', basemap);
     document.querySelectorAll('input[name="basemap"]').forEach(r => { r.checked = r.value === basemap; });
   }
 
@@ -106,7 +103,8 @@
       };
     });
 
-    setBasemap(pref('basemap', 'satellite'));
+    // 배경 지도는 열 때마다 위성으로 시작함(이전 선택을 기억하지 않음)
+    setBasemap('satellite');
     fitAll();
     map.on('mousemove', e => {
       const c = document.getElementById('cursor-ll');
