@@ -12,9 +12,8 @@ TMS.config = {
   TRAIL_SEC: 60,
   // 재생 가능 범위(초). 시안에서는 최근 30분.
   REPLAY_WINDOW_SEC: 1800,
-  // 지도 기본 중심: 제주시청 부근(사용자 지정, 2026-10-06).
-  // 가상 절차·버티포트는 이 점을 기준으로 한 상대 좌표(임의값)임.
-  MAP_CENTER: [33.4996, 126.5312],
+  // 지도 기준 위치(아래 TMS.LOCATION에서 정함). 가상 절차·버티포트는 이 점을 기준으로 한 상대 좌표(임의값)임.
+  MAP_CENTER: null,
   MAP_ZOOM: 13,
   // 창 간 연동 채널 이름
   CHANNEL: 'aamtms-console-v0',
@@ -25,6 +24,30 @@ TMS.config = {
   ACK_REQUIRED: ['warning', 'emergency', 'nodata'],
   OPERATOR: '관제 요원(시안)',
 };
+
+// 기준 위치 목록. 기본은 제주 정석비행장(사용자 지정, 2026-10-06).
+TMS.LOCATION_PRESETS = {
+  jeongseok: { label: '정석비행장', ll: [33.3964, 126.7119] },
+  jejucity:  { label: '제주시청', ll: [33.4996, 126.5312] },
+};
+TMS.DEFAULT_LOCATION = 'jeongseok';
+
+// 기준 위치 결정: 주소 ?loc=위도,경도 → 이 브라우저에 저장된 위치 → 기본 위치
+TMS.LOCATION = (function () {
+  const valid = (lat, lon) => isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 85 && Math.abs(lon) <= 180;
+  const q = new URLSearchParams(location.search).get('loc');
+  if (q) {
+    const [lat, lon] = q.split(',').map(Number);
+    if (valid(lat, lon)) return { key: 'custom', ll: [lat, lon] };
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem('aamtms.loc') || 'null');
+    if (saved && valid(saved.ll[0], saved.ll[1])) return saved;
+  } catch (e) { /* 저장소 사용 불가 시 기본 위치 */ }
+  const p = TMS.LOCATION_PRESETS[TMS.DEFAULT_LOCATION];
+  return { key: TMS.DEFAULT_LOCATION, ll: p.ll.slice() };
+})();
+TMS.config.MAP_CENTER = TMS.LOCATION.ll;
 
 // 정보 없음 판단: 마지막 유효 수신 후 경과 시간이 기준을 넘으면 참
 TMS.isStale = ageMs => ageMs > TMS.config.STALE_MS;

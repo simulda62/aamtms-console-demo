@@ -318,13 +318,18 @@ body[data-view="detail"] .asset, body[data-view="detail_events"] .asset { grid-t
 .ctl-col .ctl-btn + .ctl-btn { border-top: none; }
 .ctl-col .ctl-btn:nth-child(3) { margin-top: 10px; border-top: 1px solid var(--line-2); }
 .layer-panel {
-  display: none; width: 184px; padding: 14px 16px; background: rgba(24, 24, 24, .95); border: 1px solid var(--line-2); font-size: 13px;
+  display: none; width: 196px; max-height: 62vh; overflow-y: auto; padding: 14px 16px; background: rgba(24, 24, 24, .95); border: 1px solid var(--line-2); font-size: 13px;
 }
 .layer-panel.is-open { display: block; }
 .layer-panel h4 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em; color: var(--text); }
 .layer-panel h4:not(:first-child) { margin-top: 14px; }
 .layer-panel label { display: flex; align-items: center; gap: 9px; padding: 4px 0; cursor: pointer; }
 .layer-panel label.is-disabled { opacity: .4; cursor: not-allowed; }
+.layer-panel select { width: 100%; font-size: 12.5px; }
+.loc-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; }
+.loc-inputs input { width: 100%; min-width: 0; font: 12px var(--mono); padding: 4px 6px; }
+.loc-btns { display: grid; grid-template-columns: 1fr auto; gap: 4px; margin-top: 6px; }
+.loc-msg { margin: 6px 0 0; font-size: 11.5px; color: var(--warning); }
 
 .gauges {
   right: 14px; top: 50%; transform: translateY(-20%); display: flex; flex-direction: column; gap: 12px; align-items: center;

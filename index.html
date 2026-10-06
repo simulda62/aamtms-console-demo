@@ -110,6 +110,17 @@
             <label><input type="checkbox" id="lyr-raw" checked> 원시 수신점</label>
             <label><input type="checkbox" id="lyr-virtual" checked> 가상기체</label>
             <button type="button" class="btn btn--sm btn--block" id="btn-fit">처음 위치</button>
+            <h4>기준 위치</h4>
+            <select id="loc-preset" aria-label="기준 위치"></select>
+            <div class="loc-inputs">
+              <input type="text" id="loc-lat" inputmode="decimal" placeholder="위도" aria-label="위도">
+              <input type="text" id="loc-lon" inputmode="decimal" placeholder="경도" aria-label="경도">
+            </div>
+            <div class="loc-btns">
+              <button type="button" class="btn btn--sm" id="loc-here">지도 중심으로</button>
+              <button type="button" class="btn btn--sm btn--primary" id="loc-apply">적용</button>
+            </div>
+            <p class="loc-msg" id="loc-msg" hidden></p>
           </div>
           <div class="ctl-col">
             <button type="button" class="ctl-btn" id="zoom-in" title="확대">+</button>

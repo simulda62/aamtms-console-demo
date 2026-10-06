@@ -181,6 +181,8 @@
   S.simSigFail = id => { const now = Date.now(); S.setOverrides({ ...S.overrides, sig: { ...S.overrides.sig, [id]: { from: quant(now), to: quant(now) + 10000 } } }); };
   S.setFeedDown = on => S.setOverrides({ ...S.overrides, feedDown: on });
   S.closeAll = () => send({ type: 'close-all' });
+  // 기준 위치 변경 등 다시 불러와야 하는 설정을 연동 창 전체에 적용함
+  S.reloadAll = () => { send({ type: 'reload' }); location.reload(); };
   S.setFollow = on => { S.follow = on; emit(); };
   S.pauseAt = t => {
     const now = Date.now();
@@ -224,6 +226,7 @@
       case 'op': S.addOp(m.rec, true); break;
       case 'replay': applyReplay(m.mode, m.replay, true); break;
       case 'ov': S.setOverrides(m.ov, true); break;
+      case 'reload': location.reload(); break;
       case 'close-all': window.close(); setTimeout(() => { document.body.classList.add('is-closed'); }, 200); break;
       default: break;
     }

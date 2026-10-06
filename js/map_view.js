@@ -114,6 +114,7 @@
     });
     map.on('dragstart', () => { if (S.follow) S.setFollow(false); });
     bindControls();
+    bindLocation();
   }
 
   function bindControls() {
@@ -152,6 +153,35 @@
   function fitAll() {
     const pts = [C.MAP_CENTER].concat(...M.PROCS.map(p => p.ll), M.VERTIPORTS.map(v => v.ll));
     map.fitBounds(L.latLngBounds(pts), { padding: [60, 60] });
+  }
+
+  // 기준 위치 변경: 목록 선택·직접 입력·지도 중심. 적용하면 저장 후 연동 창과 함께 다시 불러옴.
+  function bindLocation() {
+    const sel = document.getElementById('loc-preset');
+    if (!sel) return;
+    const lat = document.getElementById('loc-lat');
+    const lon = document.getElementById('loc-lon');
+    const msg = document.getElementById('loc-msg');
+    sel.innerHTML = Object.entries(TMS.LOCATION_PRESETS).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('')
+      + '<option value="custom">직접 입력</option>';
+    const fill = ll => { lat.value = ll[0].toFixed(5); lon.value = ll[1].toFixed(5); };
+    sel.value = TMS.LOCATION_PRESETS[TMS.LOCATION.key] ? TMS.LOCATION.key : 'custom';
+    fill(TMS.LOCATION.ll);
+    sel.addEventListener('change', () => { if (TMS.LOCATION_PRESETS[sel.value]) fill(TMS.LOCATION_PRESETS[sel.value].ll); });
+    [lat, lon].forEach(i => i.addEventListener('input', () => { sel.value = 'custom'; }));
+    document.getElementById('loc-here').addEventListener('click', () => { const c = map.getCenter(); fill([c.lat, c.lng]); sel.value = 'custom'; });
+    document.getElementById('loc-apply').addEventListener('click', () => {
+      const ll = [Number(lat.value), Number(lon.value)];
+      if (!isFinite(ll[0]) || !isFinite(ll[1]) || Math.abs(ll[0]) > 85 || Math.abs(ll[1]) > 180 || lat.value === '' || lon.value === '') {
+        msg.hidden = false;
+        msg.textContent = '위도·경도를 확인할 것';
+        return;
+      }
+      try { localStorage.setItem('aamtms.loc', JSON.stringify({ key: sel.value, ll })); } catch (e) { /* 저장 불가 시 주소로 전달 */ }
+      const p = new URLSearchParams(location.search);
+      if (p.has('loc')) { p.set('loc', `${ll[0]},${ll[1]}`); history.replaceState(null, '', `${location.pathname}?${p}`); }
+      S.reloadAll();
+    });
   }
 
   function update() {
