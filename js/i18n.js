@@ -268,6 +268,7 @@
     '지도 중심으로': 'Use map center',
     '정석비행장': 'Jeongseok Airfield',
     '성산일출봉': 'Seongsan Ilchulbong',
+    '자월도 비행시험장': 'Jawoldo Flight Test Site',
     '기준 위치': 'REFERENCE POINT',
     '직접 입력': 'Custom',
     '제주시청': 'Jeju City Hall',
