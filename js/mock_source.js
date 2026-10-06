@@ -12,7 +12,8 @@
   const KT = 0.514444; // m/s
   // 가상 경로는 기준점 남쪽(육지) 위주로 배치함(북쪽 좌표를 뒤집음)
   const toLL = (e, n) => [LAT0 + n / M_LAT, LON0 + e / M_LON];
-  const flip = pt => [pt[0], -pt[1], pt[2]];
+  const SHIFT = (TMS.LOCATION && TMS.LOCATION.shift) || [0, 0];
+  const flip = pt => [pt[0] + SHIFT[0], -pt[1] + SHIFT[1], pt[2]];
 
   const VERSIONS = { policy: 'POL-가상-0.3', ruleset: 'RULESET-가상-0.1' };
 
@@ -20,7 +21,10 @@
   const VERTIPORTS = [
     { id: 'VP-A', e: -2500, n: 600 },
     { id: 'VP-B', e: 2800, n: -900 },
-  ].map(v => ({ ...v, n: -v.n, ll: toLL(v.e, -v.n) }));
+  ].map(v => {
+    const e = v.e + SHIFT[0], n = -v.n + SHIFT[1];
+    return { ...v, e, n, ll: toLL(e, n) };
+  });
 
   // 가상 예시 절차. 경로점 [동(m), 북(m), 고도(ft)]. 구간 i = 경로점 i → i+1.
   const PROCS = [

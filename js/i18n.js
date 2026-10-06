@@ -245,6 +245,7 @@
     '위도·경도를 확인할 것': 'Check latitude and longitude',
     '지도 중심으로': 'Use map center',
     '정석비행장': 'Jeongseok Airfield',
+    '성산일출봉': 'Seongsan Ilchulbong',
     '기준 위치': 'REFERENCE POINT',
     '직접 입력': 'Custom',
     '제주시청': 'Jeju City Hall',

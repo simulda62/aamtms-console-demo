@@ -25,12 +25,14 @@ TMS.config = {
   OPERATOR: '관제 요원(시안)',
 };
 
-// 기준 위치 목록. 기본은 제주 정석비행장(사용자 지정, 2026-10-06).
+// 기준 위치 목록. 기본은 성산일출봉(사용자 지정, 2026-10-06).
 TMS.LOCATION_PRESETS = {
+  // shift: 가상 경로 묶음을 기준점에서 옮겨 놓을 거리(동·북, m). 해안 기준점에서 경로가 바다로 나가지 않게 함.
+  seongsan:  { label: '성산일출봉', ll: [33.4581, 126.9425], shift: [-4000, 0] },
   jeongseok: { label: '정석비행장', ll: [33.3964, 126.7119] },
   jejucity:  { label: '제주시청', ll: [33.4996, 126.5312] },
 };
-TMS.DEFAULT_LOCATION = 'jeongseok';
+TMS.DEFAULT_LOCATION = 'seongsan';
 
 // 기준 위치 결정: 주소 ?loc=위도,경도 → 이 브라우저에 저장된 위치 → 기본 위치
 TMS.LOCATION = (function () {
@@ -42,10 +44,13 @@ TMS.LOCATION = (function () {
   }
   try {
     const saved = JSON.parse(localStorage.getItem('aamtms.loc') || 'null');
-    if (saved && valid(saved.ll[0], saved.ll[1])) return saved;
+    if (saved && valid(saved.ll[0], saved.ll[1])) {
+      const p = TMS.LOCATION_PRESETS[saved.key];
+      return p ? { key: saved.key, ll: p.ll.slice(), shift: p.shift } : { key: 'custom', ll: saved.ll };
+    }
   } catch (e) { /* 저장소 사용 불가 시 기본 위치 */ }
   const p = TMS.LOCATION_PRESETS[TMS.DEFAULT_LOCATION];
-  return { key: TMS.DEFAULT_LOCATION, ll: p.ll.slice() };
+  return { key: TMS.DEFAULT_LOCATION, ll: p.ll.slice(), shift: p.shift };
 })();
 TMS.config.MAP_CENTER = TMS.LOCATION.ll;
 
