@@ -136,7 +136,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .lang-toggle button { font: 600 11px var(--mono); letter-spacing: .06em; padding: 3px 8px; }
 .demo-flag { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--text-2); }
 .demo-flag i { width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
-.avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-3); border: 1px solid var(--line-2); font-size: 12px; font-weight: 700; margin-left: 6px; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-3); border: 1px solid var(--line-2); font: 600 10.5px var(--mono); letter-spacing: .04em; margin-left: 6px; }
 
 /* ---------- 좌측 아이콘 막대 ---------- */
 .rail { grid-column: 1; grid-row: 2 / -1; background: var(--bar); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding-top: 14px; gap: 6px; }
