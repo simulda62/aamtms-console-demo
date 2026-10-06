@@ -24,7 +24,7 @@
     const viewOpts = sel => Object.entries(TMS.VIEWS).filter(([k]) => k !== 'main')
       .map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${v.label}</option>`).join('');
     box.innerHTML = `
-      <div class="seg-ctrl">${[2, 3].map(n => `<button type="button" data-count="${n}" class="${mm.count === n ? 'is-on' : ''}">모니터 ${n}대</button>`).join('')}</div>
+      <div class="seg-ctrl">${Object.keys(TMS.LAYOUT_PRESETS).map(Number).map(n => `<button type="button" data-count="${n}" class="${mm.count === n ? 'is-on' : ''}">모니터 ${n}대</button>`).join('')}</div>
       <div class="mm-preview">${mm.assign.map((a, i) => `<div class="mm-screen"><small>화면 ${i + 1}${i === 0 ? ' (이 창)' : ''}</small><b>${TMS.VIEWS[a.view].label}</b></div>`).join('')}</div>
       <table class="tbl mm-table"><thead><tr><th>화면</th><th>역할</th><th>모니터</th><th></th></tr></thead><tbody>
       ${mm.assign.map((a, i) => `<tr><td>화면 ${i + 1}${i === 0 ? '<small>이 창</small>' : ''}</td>

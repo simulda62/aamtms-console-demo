@@ -66,6 +66,26 @@
   });
   const PERIOD = T;
 
+  // 버티포트 정차 구간(가상). 순환 경로의 지상 대기 구간을 입항(착륙)·출항(이륙)으로 봄.
+  const STOPS = [];
+  nodes.forEach((nd, i) => {
+    if (!nd.dwell) return;
+    let j = i;
+    do { j = (j - 1 + nodes.length) % nodes.length; } while (!(nodes[j].proc && nodes[j].proc.kind === '접근' && nodes[j].seg === 0));
+    let k = i;
+    do { k = (k + 1) % nodes.length; } while (nodes[k].proc === nd.proc);
+    STOPS.push({
+      vp: nd.proc.vp, arrProc: nodes[j].proc, depProc: nd.proc,
+      tArr: nd.t0, dwell: nd.dwell,
+      appDur: ((nd.t0 - nodes[j].t0) % PERIOD + PERIOD) % PERIOD,
+      depDur: ((nodes[k].t0 - (nd.t0 + nd.dwell)) % PERIOD + PERIOD) % PERIOD,
+    });
+  });
+  STOPS.forEach((s, i) => {
+    s.from = STOPS[(i - 1 + STOPS.length) % STOPS.length].vp;
+    s.to = STOPS[(i + 1) % STOPS.length].vp;
+  });
+
   function routeAt(tau) {
     tau = ((tau % PERIOD) + PERIOD) % PERIOD;
     let nd = nodes[nodes.length - 1];
@@ -289,5 +309,37 @@
   // 서명 검증 (시안: 모사 값 비교). 운영에서는 게이트웨이·조회 API 서명 방식 확정 후 교체.
   function verify(rec) { return rec.sig === 'mock-valid'; }
 
-  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, PERIOD };
+  // 버티포트 운항 일정 조회(가상). [t0, t1] 구간의 입항·출항.
+  // 계획 시각은 각본상 지연(0~3분, 일부 조기)을 뺀 분 단위 값이며, 예상·실제 시각은 모사 비행 시각임.
+  const DELAYS = [0, 0, 60, 0, 120, -60, 0, 180];
+  function schedule(vp, t0, t1) {
+    const arrivals = [], departures = [];
+    AIRCRAFT.forEach((ac, ai) => {
+      STOPS.forEach((st, si) => {
+        if (st.vp !== vp) return;
+        const base = st.tArr - ac.phase;
+        const m0 = Math.floor((t0 / 1000 - base - PERIOD) / PERIOD);
+        const m1 = Math.ceil((t1 / 1000 - base + PERIOD) / PERIOD);
+        for (let m = m0; m <= m1; m++) {
+          const tArr = (base + m * PERIOD) * 1000;
+          const tDep = tArr + st.dwell * 1000;
+          const key = (ai * 31 + si * 7 + ((m % 97) + 97)) % DELAYS.length;
+          const off = DELAYS[key] * 1000;
+          const plan = t => Math.round((t - off) / 60000) * 60000;
+          if (tArr >= t0 && tArr <= t1) {
+            arrivals.push({ id: `${ac.id}@A${tArr}`, ac: ac.id, virtual: ac.virtual, vp, from: st.from, proc: st.arrProc.id,
+              plan: plan(tArr), tStart: tArr - st.appDur * 1000, tEvent: tArr });
+          }
+          if (tDep >= t0 && tDep <= t1) {
+            departures.push({ id: `${ac.id}@D${tDep}`, ac: ac.id, virtual: ac.virtual, vp, to: st.to, proc: st.depProc.id,
+              plan: plan(tDep), tPad: tArr, tEvent: tDep, tEnd: tDep + st.depDur * 1000 });
+          }
+        }
+      });
+    });
+    const by = (a, b) => a.tEvent - b.tEvent;
+    return { arrivals: arrivals.sort(by), departures: departures.sort(by) };
+  }
+
+  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, PERIOD, schedule };
 })();

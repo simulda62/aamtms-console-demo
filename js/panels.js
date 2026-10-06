@@ -460,6 +460,85 @@
       + card('병행 운용 기록', [['기록', `${ops.length}건`], ['일치 / 불일치', `${agree} / ${ops.length - agree}`]], '<p class="hint">일치율 평가는 기록 서비스에서 수행함.</p>');
   }
 
+  // ---------- 버티포트 운항 일정 ----------
+  let schedVp = M.VERTIPORTS[0].id;
+  let schedAt = 0;
+  let schedSel;
+  function bindSchedule() {
+    const seg = $('#sched-vp');
+    seg.innerHTML = M.VERTIPORTS.map(v => `<button type="button" data-vp="${v.id}">${v.id} <em class="tag tag--virtual">가상</em></button>`).join('');
+    seg.addEventListener('click', e => { const b = e.target.closest('[data-vp]'); if (b) { schedVp = b.dataset.vp; schedAt = 0; } });
+    ['#arr-body', '#dep-body'].forEach(s => $(s).addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-ac]');
+      if (tr) S.select(tr.dataset.ac);
+    }));
+  }
+  const hm = ms => kst(ms).slice(0, 5);
+  function diffTag(plan, t) {
+    const d = Math.round((t - plan) / 60000);
+    if (!d) return '';
+    return `<span class="t-diff t-diff--${d > 0 ? 'late' : 'early'}">${d > 0 ? '+' : ''}${d}분</span>`;
+  }
+  function updateSchedule() {
+    document.querySelectorAll('#sched-vp [data-vp]').forEach(b => b.classList.toggle('is-on', b.dataset.vp === schedVp));
+    if (Date.now() - schedAt < 1000 && schedSel === S.selected) return;
+    schedAt = Date.now();
+    schedSel = S.selected;
+    const now = S.now;
+    const { arrivals, departures } = M.schedule(schedVp, now - 20 * 60000, now + 60 * 60000);
+    const nodata = id => S.displayStatus(id) === 'nodata';
+    const segOf = (id, proc) => { const r = S.recs[id]; return r && r.proc.id === proc ? ` · S${r.proc.seg + 1}` : ''; };
+
+    const arrState = r => {
+      if (now >= r.tEvent) return { k: 'past', label: '착륙' };
+      if (now >= r.tStart) return nodata(r.ac) ? { k: 'nodata', label: '정보 없음' } : { k: 'active', label: `접근 중${segOf(r.ac, r.proc)}` };
+      return { k: 'future', label: '예정' };
+    };
+    const depState = r => {
+      if (now >= r.tEnd) return { k: 'past', label: '출발 완료' };
+      if (now >= r.tPad) {
+        if (nodata(r.ac)) return { k: 'nodata', label: '정보 없음' };
+        return now < r.tEvent ? { k: 'active', label: '패드 대기' } : { k: 'active', label: `출발 중${segOf(r.ac, r.proc)}` };
+      }
+      return { k: 'future', label: '예정' };
+    };
+    const table = (rows, stateOf, placeKey, placeLabel) => {
+      let html = `<table class="tbl tbl--sched"><thead><tr><th>계획</th><th>예상·실제</th><th>기체</th><th>${placeLabel}</th><th>절차</th><th>상태</th><th>판정</th></tr></thead><tbody>`;
+      let lined = false;
+      rows.forEach(r => {
+        if (!lined && r.tEvent >= now) { html += `<tr class="now-row"><td colspan="7"><div class="now-line">현재 ${kst(now)}</div></td></tr>`; lined = true; }
+        const s = stateOf(r);
+        const st = S.displayStatus(r.ac);
+        const hideEst = s.k !== 'past' && nodata(r.ac);
+        html += `<tr data-ac="${r.ac}" class="is-${s.k}${r.ac === S.selected ? ' is-selected' : ''}">
+          <td class="t-plan">${hm(r.plan)}</td>
+          <td>${hideEst ? '<span class="muted">—</span>' : `<span class="t-est">${hm(r.tEvent)}</span>${diffTag(r.plan, r.tEvent)}`}</td>
+          <td><span class="ev-ac">${diamond(`dia--${s.k === 'past' ? 'normal' : st}${r.virtual ? ' dia--virtual' : ''}`)}<b>${r.ac}</b>${r.virtual ? '<em class="tag tag--virtual">가상</em>' : '<em class="tag tag--real">실기체</em>'}</span></td>
+          <td>${r[placeKey]}</td>
+          <td class="mono">${r.proc}</td>
+          <td><span class="sched-st sched-st--${s.k}">${s.label}</span></td>
+          <td>${s.k === 'active' || s.k === 'nodata' ? stTag(st) : '<span class="muted">—</span>'}</td></tr>`;
+      });
+      if (!lined) html += `<tr class="now-row"><td colspan="7"><div class="now-line">현재 ${kst(now)}</div></td></tr>`;
+      return `${html}</tbody></table>`;
+    };
+    $('#arr-body').innerHTML = table(arrivals, arrState, 'from', '출발지');
+    $('#dep-body').innerHTML = table(departures, depState, 'to', '도착지');
+    $('#arr-count').textContent = arrivals.length;
+    $('#dep-count').textContent = departures.length;
+
+    const nextArr = arrivals.find(r => r.tEvent > now && arrState(r).k === 'future') || arrivals.find(r => r.tEvent > now);
+    const nextDep = departures.find(r => r.tEvent > now);
+    const approaching = arrivals.filter(r => arrState(r).k === 'active').length;
+    const atPad = departures.filter(r => now >= r.tPad && now < r.tEvent && !nodata(r.ac)).length;
+    $('#sched-sum').innerHTML = kv([
+      ['다음 입항', nextArr ? `${nextArr.ac} ${hm(nextArr.tEvent)}` : '—'],
+      ['접근 중', `${approaching}`],
+      ['패드 대기', `${atPad}`],
+      ['다음 출항', nextDep ? `${nextDep.ac} ${hm(nextDep.tEvent)}` : '—'],
+    ]);
+  }
+
   // ---------- 지도 위 경보·수신 표시 ----------
   function updateAlerts() {
     const el = $('#alert-strip');
@@ -502,6 +581,7 @@
     buildTabs();
     buildList();
     bindDetail();
+    bindSchedule();
     player = Player($('#timeline'));
     document.querySelectorAll('#rail [data-rail]').forEach(b => b.addEventListener('click', () => {
       if (b.dataset.rail === 'assets') document.body.classList.toggle('assets-closed');
@@ -524,6 +604,7 @@
     if (visible('pane-detail')) updateDetail();
     if (visible('pane-events')) updateEvents();
     if (visible('pane-system')) updateSystem();
+    if (S.view === 'schedule') updateSchedule();
     if (visible('pane-map')) { updateAlerts(); updateGauges(); }
   }
 
