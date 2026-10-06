@@ -213,7 +213,7 @@
   let showStale = false;
   let opChoice = null;
   let opRendered = -1;
-  const open = new Set(['ov', 'data', 'items', 'paths', 'ver', 'op']);
+  const open = new Set(['ov', 'data', 'items', 'paths', 'proc', 'ver', 'op']);
   const q = k => document.querySelector(`#detail [data-k="${k}"]`);
   const section = (key, title, body) => `<section class="sec${open.has(key) ? ' is-open' : ''}" data-sec="${key}">
     <button type="button" class="sec__head">${title}<i></i></button><div class="sec__body">${body}</div></section>`;
