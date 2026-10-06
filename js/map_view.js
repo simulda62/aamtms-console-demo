@@ -129,6 +129,13 @@
       lp.classList.toggle('is-open', wide);
       lb.classList.toggle('is-on', wide);
       lb.addEventListener('click', () => lb.classList.toggle('is-on', lp.classList.toggle('is-open')));
+      on('layer-close', 'click', () => {
+        lp.classList.remove('is-open');
+        lb.classList.remove('is-on');
+        // 다시 여는 버튼 위치를 알 수 있도록 잠깐 강조함
+        lb.classList.add('is-hint');
+        setTimeout(() => lb.classList.remove('is-hint'), 2400);
+      });
     }
     on('btn-fit', 'click', () => { S.setFollow(false); fitAll(); });
     document.querySelectorAll('input[name="basemap"]').forEach(r => {
