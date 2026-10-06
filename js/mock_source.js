@@ -79,6 +79,7 @@
 
   let VERTIPORTS, PROCS, LOOPS;
   let HOLDS = [];
+  let HOLD_AREAS = [];
   // 공중대기 경로(경주로형, 오른쪽 선회). 기점 F에서 접근 방향 u로 들어와 선회 → 바깥 직선 → 선회 → 안쪽 직선으로 F에 돌아옴.
   const HR = C.HOLD_TURN_RADIUS_M, HL = C.HOLD_LEG_M;
   const HOLD_LAP_M = 2 * Math.PI * HR + 2 * HL;
@@ -121,15 +122,28 @@
     // 한 방향 노선: 출발 절차(2구간) + 접근 절차(3구간). 진행 방향 오른쪽으로 250m 띄워 왕복 경로가 겹치지 않게 함.
     // 공중대기 공역: 중심 버티포트 기준 방위·거리로 기점을 두고, 접근 방향(기점→중심)을 대기 경로의 안쪽 방향으로 씀
     const hubV = vp[NET.hub];
-    HOLDS = (NET.holds || []).map(h => {
+    // 공역 안에서 노선마다 대기 경로를 옆으로 1.3km씩 떼어 둠(HOLD-W1, W2 …). 대기 고도도 노선별로 다름.
+    HOLD_AREAS = [];
+    HOLDS = [];
+    (NET.holds || []).forEach(h => {
       const b = h.bearing * Math.PI / 180;
-      const e = hubV.e + Math.sin(b) * h.dist, n = hubV.n + Math.cos(b) * h.dist;
-      const L = Math.hypot(hubV.e - e, hubV.n - n);
-      const hold = { id: h.id, serves: h.serves, stack: h.stack, e, n, ux: (hubV.e - e) / L, uy: (hubV.n - n) / L, ll: toLL(e, n) };
-      const pts = [];
-      for (let s = 0; s <= HOLD_LAP_M; s += 100) { const q = holdPos(hold, s); pts.push(toLL(q.e, q.n)); }
-      hold.pattern = pts;
-      return hold;
+      const e0 = hubV.e + Math.sin(b) * h.dist, n0 = hubV.n + Math.cos(b) * h.dist;
+      const L = Math.hypot(hubV.e - e0, hubV.n - n0);
+      const ux = (hubV.e - e0) / L, uy = (hubV.n - n0) / L;
+      const rx = uy, ry = -ux;
+      const cnt = h.serves.length;
+      h.serves.forEach((route, j) => {
+        const off = (j - (cnt - 1) / 2) * 1300;
+        const e = e0 + rx * off, n = n0 + ry * off;
+        const hold = { id: `${h.id}${j + 1}`, area: h.id, serves: [route], alt: h.stack[j] || 1000, e, n, ux, uy, ll: toLL(e, n) };
+        const pts = [];
+        for (let s = 0; s <= HOLD_LAP_M; s += 100) { const q = holdPos(hold, s); pts.push(toLL(q.e, q.n)); }
+        hold.pattern = pts;
+        HOLDS.push(hold);
+      });
+      // 공역 이름은 대기 경로 바깥쪽(중심 반대 방향)에 한 번만 표시
+      const le = e0 - ux * (HL + 900) + rx * HR, ln = n0 - uy * (HL + 900) + ry * HR;
+      HOLD_AREAS.push({ id: h.id, ll: toLL(le, ln) });
     });
     const holdFor = d => HOLDS.find(h => h.serves.includes(d));
     const leg = (a, b) => {
@@ -142,7 +156,7 @@
       let arrPts;
       if (h) {
         // 중심 버티포트 접근은 공중대기 기점을 지남: 중간점 → 대기 기점(노선별 대기 고도) → 최종 접근점 → 착륙
-        const alt = h.stack[h.serves.indexOf(a)] || 1000;
+        const alt = h.alt;
         arrPts = [[...at(L * 0.5, 250), 1500], [h.e, h.n, alt], [B.e - h.ux * 1000, B.n - h.uy * 1000, 300], [B.e, B.n, 0]];
       } else {
         arrPts = [[...at(L * 0.5, 250), 1500], [...at(L - 2500, 250), 800], [...at(L - 1000, 100), 300], [B.e, B.n, 0]];
@@ -273,13 +287,17 @@
       }
     });
   })();
-  // 회차(m)별 공중대기 바퀴 수(결정적 난수)
+  // 회차(m)별 공중대기 바퀴 수. 기체마다 10회차 묶음 안에서 2바퀴·1바퀴 횟수를 확률에 맞춰 고정하고 순서만 무작위로 섞음
+  // (순수 무작위로 하면 짧은 시간대에 공중대기가 몰릴 수 있음). 결정적이라 모든 화면에서 같음.
   function holdLaps(ac, m) {
     if (!ac.hold || !ac.hold.maxLaps) return 0;
-    const r = rnd(m, AC_INDEX[ac.id], 11);
-    if (r < C.HOLD_PROB_2 && ac.hold.maxLaps >= 2) return 2;
-    if (r < C.HOLD_PROB_1 + C.HOLD_PROB_2) return 1;
-    return 0;
+    const B = 10, blk = Math.floor(m / B), idx = ((m % B) + B) % B, ai = AC_INDEX[ac.id];
+    const slots = Array.from({ length: B }, (_, i) => i);
+    for (let i = B - 1; i > 0; i--) { const j = Math.floor(rnd(blk, ai, 20 + i) * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
+    const n2 = ac.hold.maxLaps >= 2 ? Math.round(C.HOLD_PROB_2 * B) : 0;
+    const n1 = Math.round(C.HOLD_PROB_1 * B) + (ac.hold.maxLaps >= 2 ? 0 : Math.round(C.HOLD_PROB_2 * B));
+    const rank = slots.indexOf(idx);
+    return rank < n2 ? 2 : rank < n2 + n1 ? 1 : 0;
   }
   // 기체 위치(공중대기 반영)
   function routeWithHold(ac, t) {
@@ -576,5 +594,5 @@
     return out;
   }
 
-  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, HOLDS, HOLD_LAP_SEC, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName, padCheck };
+  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, HOLDS, HOLD_AREAS, HOLD_LAP_SEC, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName, padCheck };
 })();

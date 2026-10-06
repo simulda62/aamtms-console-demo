@@ -87,14 +87,23 @@
       p.ll.slice(1, -1).forEach(ll => {
         L.circleMarker(ll, { radius: 2.5, color: COLORS.proc, weight: 1, opacity: 0.6, fillColor: '#111', fillOpacity: 1, interactive: false }).addTo(procLayer);
       });
-      const mid = p.ll[Math.floor(p.segCount / 2)];
+      // 절차 이름은 가장 긴 구간의 가운데에 둠(대기 기점·버티포트 근처 겹침 방지)
+      let li = 0, best = -1;
+      for (let i = 0; i < p.segCount; i++) {
+        const d = Math.hypot(p.pts[i + 1][0] - p.pts[i][0], p.pts[i + 1][1] - p.pts[i][1]);
+        if (d > best) { best = d; li = i; }
+      }
+      const mid = [(p.ll[li][0] + p.ll[li + 1][0]) / 2, (p.ll[li][1] + p.ll[li + 1][1]) / 2];
       L.marker(mid, { interactive: false, icon: L.divIcon({ className: 'proc-label', html: `${p.id} <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);
     });
     // 공중대기 공역(가상): 대기 경로와 기점
     (M.HOLDS || []).forEach(h => {
-      L.polyline(h.pattern, { color: '#c4b5fd', weight: 1.5, opacity: 0.8, dashArray: '2 5', interactive: false }).addTo(procLayer);
-      L.circleMarker(h.ll, { radius: 3.5, color: '#c4b5fd', weight: 1.5, fillColor: '#111', fillOpacity: 1, interactive: false }).addTo(procLayer);
-      L.marker(h.ll, { interactive: false, icon: L.divIcon({ className: 'hold-label', html: `${h.id} 공중대기 <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);
+      L.polyline(h.pattern, { color: '#c4b5fd', weight: 2, opacity: 0.9, dashArray: '4 4', interactive: false }).addTo(procLayer);
+      // 대기 기점 표식: 보라 마름모 + 경로 식별자·대기 고도
+      L.marker(h.ll, { interactive: false, icon: L.divIcon({ className: 'hold-fix', html: `<span class="hold-fix__mk"></span><span class="hold-fix__txt">${h.id} · ${h.alt}ft</span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(procLayer);
+    });
+    (M.HOLD_AREAS || []).forEach(a => {
+      L.marker(a.ll, { interactive: false, icon: L.divIcon({ className: 'hold-label', html: `${a.id} 공중대기 <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);
     });
     M.VERTIPORTS.forEach(v => {
       L.marker(v.ll, { interactive: false, icon: L.divIcon({ className: 'vp-icon', html: `<div class="vp">H</div><div class="vp__label">${v.name || v.id} <i>가상</i></div>`, iconSize: [20, 20], iconAnchor: [10, 10] }) }).addTo(procLayer);
@@ -253,8 +262,35 @@
     });
 
     if (S.follow && selRec && S.isFresh(sel)) map.panTo([selRec.fused.lat, selRec.fused.lon], { animate: false });
+    declutter();
     const fol = document.getElementById('btn-follow');
     if (fol) fol.classList.toggle('is-on', S.follow);
+  }
+
+  // 기체 정보 표지 겹침 피하기: 화면 좌표로 표지 상자를 만들고, 겹치면 아래로 비켜 놓고 연결선을 그림
+  function declutter() {
+    const placed = [];
+    M.AIRCRAFT.map(ac => {
+      const mk = markers[ac.id];
+      const el = mk.getElement();
+      if (!el || el.style.display === 'none') return null;
+      const lab = el.querySelector('.mk__label');
+      if (!lab || lab.offsetParent === null) return null;
+      return { lab, p: map.latLngToContainerPoint(mk.getLatLng()), w: lab.offsetWidth, h: lab.offsetHeight, sel: ac.id === S.selected };
+    }).filter(Boolean)
+      .sort((a, b) => (b.sel - a.sel) || a.p.y - b.p.y || a.p.x - b.p.x)
+      .forEach(it => {
+        let dy = 0;
+        for (let k = 0; k < 10; k++) {
+          const box = { x: it.p.x + 14, y: it.p.y - 16 + dy, w: it.w, h: it.h };
+          const hit = placed.some(b => box.x < b.x + b.w + 4 && b.x < box.x + box.w + 4 && box.y < b.y + b.h + 2 && b.y < box.y + box.h + 2);
+          if (!hit) { placed.push(box); break; }
+          dy += it.h + 4;
+        }
+        it.lab.style.top = `${dy}px`;
+        it.lab.style.setProperty('--dy', `${dy}px`);
+        it.lab.classList.toggle('is-shifted', dy > 0);
+      });
   }
 
   function focus(id) {

@@ -75,6 +75,11 @@ TMS.DEFAULT_LOCATION = 'seongsan';
 TMS.LOCATION = (function () {
   const valid = (lat, lon) => isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 85 && Math.abs(lon) <= 180;
   const q = new URLSearchParams(location.search).get('loc');
+  // ?loc=목록 키(예: jawoldo)이면 해당 기준 위치, ?loc=위도,경도이면 직접 지정
+  if (q && TMS.LOCATION_PRESETS[q]) {
+    const p = TMS.LOCATION_PRESETS[q];
+    return { key: q, ll: p.ll.slice(), shift: p.shift, network: p.network };
+  }
   if (q) {
     const [lat, lon] = q.split(',').map(Number);
     if (valid(lat, lon)) return { key: 'custom', ll: [lat, lon] };
