@@ -141,7 +141,10 @@
     });
     // 공중대기점: 대기 경로 안쪽 방향은 버티포트 쪽, 경로는 바깥쪽으로 뻗음
     HOLDS = Object.entries(V.holds).map(([id, h]) => {
-      const q = polar(h.bearing, h.dist), u = unit(q, H0);
+      const q = polar(h.bearing, h.dist), u0 = unit(q, H0);
+      // 대기 경로 방향: 버티포트를 향하는 방향에서 rotate(도, 시계 방향 +)만큼 돌림
+      const hd = Math.atan2(u0[0], u0[1]) + (h.rotate || 0) * Math.PI / 180;
+      const u = [Math.sin(hd), Math.cos(hd)];
       const hold = { id, turn: h.turn === 'L' ? -1 : 1, e: q[0], n: q[1], ux: u[0], uy: u[1], ll: toLL(q[0], q[1]), alts: [] };
       const pat = [];
       for (let s2 = 0; s2 <= HOLD_LAP_M; s2 += 100) { const r2 = holdPos(hold, s2); pat.push(toLL(r2.e, r2.n)); }

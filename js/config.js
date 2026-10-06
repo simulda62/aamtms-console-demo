@@ -70,9 +70,10 @@ TMS.LOCATION_PRESETS = {
           'VRP-SE': { bearing: 120, dist: 2000, clock: 4 },
           'VRP-SW': { bearing: 240, dist: 2000, clock: 8 },
         },
+        // rotate: 대기 경로 방향 회전(도, 시계 방향 +). 기본 방향은 안쪽 직선이 버티포트를 향함.
         holds: {
-          'HOLD-W': { bearing: 270, dist: 3000, turn: 'R' },
-          'HOLD-E': { bearing: 90, dist: 3000, turn: 'R' },
+          'HOLD-W': { bearing: 270, dist: 3000, turn: 'R', rotate: -90 },
+          'HOLD-E': { bearing: 90, dist: 3000, turn: 'R', rotate: 90 },
         },
         gateDist: 1000, // 이륙 후 상승 지점·최종 접근점: 버티포트에서 1km
         depAlt: 1200,   // 출항 보고점 통과 고도(ft)
