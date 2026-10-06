@@ -406,7 +406,9 @@
     const lowFade = Math.max(0, Math.min(1, (r.alt - 700) / 400));
     // 공중대기 중에는 경로 이탈 없음. 대기 진입 전·후 20초 동안 이탈 폭을 서서히 줄이고 늘림
     const holdFade = r.holdEdge == null ? 1 : Math.max(0, Math.min(1, r.holdEdge / 20));
-    const off = ev && ev.kind === 'lateral' && !r.holding ? 320 * Math.sin(Math.PI * ev.u / ev.dur) * lowFade * holdFade : 0;
+    // 경로가 꺾이는 경로점 앞뒤 400m에서는 이탈 폭을 줄여 모퉁이에서 위치가 튀지 않게 함
+    const cornerFade = r.holding || r.ground ? 0 : Math.max(0, Math.min(1, Math.min(r.f * r.nd.len, (1 - r.f) * r.nd.len) / 400));
+    const off = ev && ev.kind === 'lateral' && !r.holding ? 320 * Math.sin(Math.PI * ev.u / ev.dur) * lowFade * holdFade * cornerFade : 0;
     const e = r.e + r.nd.un * off, n = r.n - r.nd.ue * off;
     const vs = ev && ev.kind === 'descent' && !r.ground ? -1500 : r.vs;
     const gs = ev && ev.kind === 'speed' && !r.ground ? r.gs + 30 : r.gs;

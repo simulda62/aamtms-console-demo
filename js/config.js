@@ -61,14 +61,14 @@ TMS.LOCATION_PRESETS = {
       ],
       destinations: ['DIJ', 'SIJ', 'SBD', 'DJD', 'YHD'],
       // 자월도 시험장 시계비행(VFR) 국지절차(가상 예시). 위치는 중심 버티포트 기준 방위(도)·거리(m).
-      // 보고점은 A(북서)·B(북동)·C(남동)·D(남서). 각 섬은 방향이 가까운 보고점으로 출입항하며,
+      // 보고점은 A(북서, 왼쪽 위)·B(남서, 왼쪽 아래)·C(북동, 오른쪽 위)·D(남동, 오른쪽 아래). 각 섬은 방향이 가까운 보고점으로 출입항하며,
       // 출항은 보고점을 1,200ft, 입항은 800ft로 지나 고도로 분리함. 공중대기점은 서·동 두 곳.
       vfr: {
         points: {
           A: { bearing: 300, dist: 2000 },
-          B: { bearing: 60, dist: 2000 },
-          C: { bearing: 120, dist: 2000 },
-          D: { bearing: 240, dist: 2000 },
+          B: { bearing: 240, dist: 2000 },
+          C: { bearing: 60, dist: 2000 },
+          D: { bearing: 120, dist: 2000 },
         },
         // rotate: 대기 경로 방향 회전(도, 시계 방향 +). 기본 방향은 안쪽 직선이 버티포트를 향함.
         holds: {
@@ -81,17 +81,17 @@ TMS.LOCATION_PRESETS = {
         departures: { 'DEP-JAW-A': 'A', 'DEP-JAW-B': 'B', 'DEP-JAW-C': 'C', 'DEP-JAW-D': 'D' },
         arrivals: {
           'ARR-JAW-A': { vrp: 'A', hold: 'HOLD-W' },
-          'ARR-JAW-D': { vrp: 'D', hold: 'HOLD-W' },
-          'ARR-JAW-B': { vrp: 'B', hold: 'HOLD-E' },
+          'ARR-JAW-B': { vrp: 'B', hold: 'HOLD-W' },
           'ARR-JAW-C': { vrp: 'C', hold: 'HOLD-E' },
+          'ARR-JAW-D': { vrp: 'D', hold: 'HOLD-E' },
         },
         // 노선별 출항 절차·입항 절차·공중대기 고도(ft). 같은 대기점은 고도로 층을 나눔.
         routes: {
           DJD: { dep: 'DEP-JAW-A', arr: 'ARR-JAW-A', holdAlt: 900 },
-          SIJ: { dep: 'DEP-JAW-D', arr: 'ARR-JAW-D', holdAlt: 1200 },
-          DIJ: { dep: 'DEP-JAW-D', arr: 'ARR-JAW-D', holdAlt: 1500 },
-          SBD: { dep: 'DEP-JAW-C', arr: 'ARR-JAW-C', holdAlt: 900 },
-          YHD: { dep: 'DEP-JAW-B', arr: 'ARR-JAW-B', holdAlt: 1200 },
+          SIJ: { dep: 'DEP-JAW-B', arr: 'ARR-JAW-B', holdAlt: 1200 },
+          DIJ: { dep: 'DEP-JAW-B', arr: 'ARR-JAW-B', holdAlt: 1500 },
+          SBD: { dep: 'DEP-JAW-D', arr: 'ARR-JAW-D', holdAlt: 900 },
+          YHD: { dep: 'DEP-JAW-C', arr: 'ARR-JAW-C', holdAlt: 1200 },
         },
       },
     },
