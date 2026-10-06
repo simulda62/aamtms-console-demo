@@ -80,6 +80,7 @@
   let VERTIPORTS, PROCS, LOOPS;
   let HOLDS = [];
   let HOLD_AREAS = [];
+  let VFR_POINTS = [];
   // 공중대기 경로(경주로형, 오른쪽 선회). 기점 F에서 접근 방향 u로 들어와 선회 → 바깥 직선 → 선회 → 안쪽 직선으로 F에 돌아옴.
   const HR = C.HOLD_TURN_RADIUS_M, HL = C.HOLD_LEG_M;
   const HOLD_LAP_M = 2 * Math.PI * HR + 2 * HL;
@@ -87,7 +88,8 @@
   const HOLD_LAP_SEC = HOLD_LAP_M / HOLD_V;
   function holdPos(h, s) {
     s = ((s % HOLD_LAP_M) + HOLD_LAP_M) % HOLD_LAP_M;
-    const u = [h.ux, h.uy], r = [h.uy, -h.ux], F = [h.e, h.n];
+    const tw = h.turn || 1; // 1 오른쪽 선회, -1 왼쪽 선회
+    const u = [h.ux, h.uy], r = [h.uy * tw, -h.ux * tw], F = [h.e, h.n];
     const C1 = [F[0] + HR * r[0], F[1] + HR * r[1]];
     const arc = Math.PI * HR;
     const pt = (x, y, dx, dy) => ({ e: x, n: y, hdg: (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360 });
@@ -122,51 +124,74 @@
     // 한 방향 노선: 출발 절차(2구간) + 접근 절차(3구간). 진행 방향 오른쪽으로 250m 띄워 왕복 경로가 겹치지 않게 함.
     // 공중대기 공역: 중심 버티포트 기준 방위·거리로 기점을 두고, 접근 방향(기점→중심)을 대기 경로의 안쪽 방향으로 씀
     const hubV = vp[NET.hub];
-    // 공역 안에서 노선마다 대기 경로를 옆으로 1.3km씩 떼어 둠(HOLD-W1, W2 …). 대기 고도도 노선별로 다름.
-    HOLD_AREAS = [];
-    HOLDS = [];
-    (NET.holds || []).forEach(h => {
-      const b = h.bearing * Math.PI / 180;
-      const e0 = hubV.e + Math.sin(b) * h.dist, n0 = hubV.n + Math.cos(b) * h.dist;
-      const L = Math.hypot(hubV.e - e0, hubV.n - n0);
-      const ux = (hubV.e - e0) / L, uy = (hubV.n - n0) / L;
-      const rx = uy, ry = -ux;
-      const cnt = h.serves.length;
-      h.serves.forEach((route, j) => {
-        const off = (j - (cnt - 1) / 2) * 1300;
-        const e = e0 + rx * off, n = n0 + ry * off;
-        const hold = { id: `${h.id}${j + 1}`, area: h.id, serves: [route], alt: h.stack[j] || 1000, e, n, ux, uy, ll: toLL(e, n) };
-        const pts = [];
-        for (let s = 0; s <= HOLD_LAP_M; s += 100) { const q = holdPos(hold, s); pts.push(toLL(q.e, q.n)); }
-        hold.pattern = pts;
-        HOLDS.push(hold);
-      });
-      // 공역 이름은 대기 경로 바깥쪽(중심 반대 방향)에 한 번만 표시
-      const le = e0 - ux * (HL + 900) + rx * HR, ln = n0 - uy * (HL + 900) + ry * HR;
-      HOLD_AREAS.push({ id: h.id, ll: toLL(le, ln) });
+    // ---- 중심 버티포트 시계비행 국지절차(가상) ----
+    const V = NET.vfr;
+    const H0 = [hubV.e, hubV.n];
+    const rel = p => [H0[0] + p[0], H0[1] + p[1]];
+    VFR_POINTS = Object.entries(V.points).map(([id, p]) => { const q = rel(p); return { id, e: q[0], n: q[1], ll: toLL(q[0], q[1]) }; });
+    const pt = id => VFR_POINTS.find(x => x.id === id);
+    const unit = (a, b) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+    // 출항 절차: 버티포트 → 상승 지점(1km, 500ft) → 출항 보고점(1500ft)
+    const depProcs = {};
+    Object.entries(V.departures).forEach(([id, vrp]) => {
+      const P = pt(vrp), u = unit(H0, [P.e, P.n]);
+      depProcs[id] = mkProc({ id, ver: '0.1', kind: '출발', vp: NET.hub, gate: vrp,
+        pts: [[H0[0], H0[1], 0], [H0[0] + u[0] * V.gateDist, H0[1] + u[1] * V.gateDist, 500], [P.e, P.n, 1500]] });
+      PROCS.push(depProcs[id]);
     });
-    const holdFor = d => HOLDS.find(h => h.serves.includes(d));
-    const leg = (a, b) => {
-      const A = vp[a], B = vp[b];
-      const L = Math.hypot(B.e - A.e, B.n - A.n), ux = (B.e - A.e) / L, uy = (B.n - A.n) / L;
-      const at = (d, off) => [A.e + ux * d + uy * off, A.n + uy * d - ux * off];
-      const dep = mkProc({ id: `DEP-${a}-${b}`, ver: '0.1', kind: '출발', vp: a,
-        pts: [[A.e, A.n, 0], [...at(1200, 250), 500], [...at(L * 0.5, 250), 1500]] });
-      const h = b === NET.hub ? holdFor(a) : null;
-      let arrPts;
-      if (h) {
-        // 중심 버티포트 접근은 공중대기 기점을 지남: 중간점 → 대기 기점(노선별 대기 고도) → 최종 접근점 → 착륙
-        const alt = h.alt;
-        arrPts = [[...at(L * 0.5, 250), 1500], [h.e, h.n, alt], [B.e - h.ux * 1000, B.n - h.uy * 1000, 300], [B.e, B.n, 0]];
-      } else {
-        arrPts = [[...at(L * 0.5, 250), 1500], [...at(L - 2500, 250), 800], [...at(L - 1000, 100), 300], [B.e, B.n, 0]];
-      }
-      const arr = mkProc({ id: `ARR-${a}-${b}`, ver: '0.1', kind: '접근', vp: b, pts: arrPts, hold: h ? h.id : null });
-      PROCS.push(dep, arr);
-      return [dep, arr];
+    // 입항 절차: 대기점 → 입항 보고점(800ft) → 최종 접근점(1km, 300ft) → 착륙. 대기점 고도는 노선별로 다름(같은 대기점에서 층 분리).
+    const arrDefs = {};
+    HOLDS = [];
+    Object.entries(V.arrivals).forEach(([id, a]) => {
+      const P = pt(a.vrp), Hq = rel(a.hold.at);
+      const u = unit(Hq, H0); // 대기점 → 버티포트 방향(대기 경로 안쪽 방향)
+      const hold = { id: a.hold.id, arr: id, turn: a.hold.turn === 'L' ? -1 : 1, e: Hq[0], n: Hq[1], ux: u[0], uy: u[1], ll: toLL(Hq[0], Hq[1]), alts: [] };
+      const pat = [];
+      for (let s2 = 0; s2 <= HOLD_LAP_M; s2 += 100) { const q = holdPos(hold, s2); pat.push(toLL(q.e, q.n)); }
+      hold.pattern = pat;
+      HOLDS.push(hold);
+      const g = unit([P.e, P.n], H0);
+      arrDefs[id] = { hold, vrp: P, final: [H0[0] - g[0] * V.gateDist, H0[1] - g[1] * V.gateDist] };
+    });
+    const arrCache = {};
+    const hubArr = (id, alt) => {
+      const k = `${id}@${alt}`;
+      if (arrCache[k]) return arrCache[k];
+      const d = arrDefs[id];
+      if (!d.hold.alts.includes(alt)) d.hold.alts.push(alt);
+      const p = mkProc({ id, ver: '0.1', kind: '접근', vp: NET.hub, hold: d.hold.id, gate: d.vrp.id,
+        pts: [[d.hold.e, d.hold.n, alt], [d.vrp.e, d.vrp.n, 800], [d.final[0], d.final[1], 300], [H0[0], H0[1], 0]] });
+      if (!Object.keys(arrCache).some(x => x.startsWith(`${id}@`))) PROCS.push(p); // 지도에는 절차당 한 번만 그림
+      arrCache[k] = p;
+      return p;
     };
+    // 섬 방향 노선: 출항 보고점 → 섬 접근(섬은 단순 접근), 섬 출발 → 입항 대기점
+    const islandArr = (x, from) => {
+      const X = vp[x];
+      const L = Math.hypot(X.e - from[0], X.n - from[1]), ux = (X.e - from[0]) / L, uy = (X.n - from[1]) / L;
+      const at = d => [from[0] + ux * d, from[1] + uy * d];
+      const p = mkProc({ id: `ARR-${x}`, ver: '0.1', kind: '접근', vp: x,
+        pts: [[from[0], from[1], 1500], [...at(L - 2500), 800], [...at(L - 1000), 300], [X.e, X.n, 0]] });
+      PROCS.push(p);
+      return p;
+    };
+    const islandDep = (x, to, toAlt) => {
+      const X = vp[x];
+      const L = Math.hypot(to[0] - X.e, to[1] - X.n), ux = (to[0] - X.e) / L, uy = (to[1] - X.n) / L;
+      const at = d => [X.e + ux * d, X.n + uy * d];
+      const p = mkProc({ id: `DEP-${x}`, ver: '0.1', kind: '출발', vp: x,
+        pts: [[X.e, X.n, 0], [...at(1200), 500], [...at(L * 0.5), 1000], [to[0], to[1], toAlt]] });
+      PROCS.push(p);
+      return p;
+    };
+    const legs = NET.destinations.map(x => {
+      const r = V.routes[x];
+      const dep = depProcs[r.dep];
+      const vrp = dep.pts[dep.pts.length - 1];
+      const arrHub = hubArr(r.arr, r.holdAlt);
+      return [dep, islandArr(x, vrp), islandDep(x, [arrHub.pts[0][0], arrHub.pts[0][1]], r.holdAlt), arrHub];
+    });
     // 운항 주기를 모든 노선에 같게 맞춤(중심 지상 대기 고정, 남는 시간은 섬 지상 대기)
-    const legs = NET.destinations.map(d => [...leg(NET.hub, d), ...leg(d, NET.hub)]);
     const hubDwell = C.HUB_TURNAROUND_SEC, islandMin = C.ISLAND_MIN_TURNAROUND_SEC;
     const base = legs.map(procs => buildLoop(procs, v => (v === NET.hub ? hubDwell : islandMin)).period);
     const cycle = Math.max(C.NETWORK_CYCLE_SEC, Math.ceil(Math.max(...base) / 60) * 60 + 120);
@@ -256,7 +281,7 @@
   AIRCRAFT.forEach(ac => {
     const lp = ac.loop;
     const n = lp.nodes;
-    const fixIdx = n.findIndex(nd => nd.proc && nd.proc.hold && nd.seg === 1);
+    const fixIdx = n.findIndex(nd => nd.proc && nd.proc.hold && nd.seg === 0);
     if (fixIdx < 0) return;
     const island = lp.stops.find(st => st.vp !== n[fixIdx].proc.vp);
     const fixNode = n[fixIdx];
@@ -565,7 +590,7 @@
             const H = lapsArr * HOLD_LAP_SEC * 1000;
             const fixAt = isHub ? tArr - (P - hd.tauF) * 1000 : null;
             arrivals.push({ id: `${ac.id}@A${tArr}`, ac: ac.id, virtual: ac.virtual, vp, from: st.from, proc: st.arrProc.id,
-              plan: plan(tArr), tStart: tArr - st.appDur * 1000 - H, tEvent: tArr, landMs: st.landDur * 1000,
+              plan: plan(tArr), tStart: tArr - st.appDur * 1000, tEvent: tArr, landMs: st.landDur * 1000,
               hold: lapsArr ? { fix: st.arrProc.hold, laps: lapsArr, start: fixAt - H, end: fixAt, lapMs: HOLD_LAP_SEC * 1000 } : null });
           }
           const tDepAct = tDep - lapsDep * HOLD_LAP_SEC * 1000;
@@ -594,5 +619,5 @@
     return out;
   }
 
-  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, HOLDS, HOLD_AREAS, HOLD_LAP_SEC, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName, padCheck };
+  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, HOLDS, HOLD_AREAS, VFR_POINTS, HOLD_LAP_SEC, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName, padCheck };
 })();

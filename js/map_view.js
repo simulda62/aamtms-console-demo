@@ -100,7 +100,11 @@
     (M.HOLDS || []).forEach(h => {
       L.polyline(h.pattern, { color: '#c4b5fd', weight: 2, opacity: 0.9, dashArray: '4 4', interactive: false }).addTo(procLayer);
       // 대기 기점 표식: 보라 마름모 + 경로 식별자·대기 고도
-      L.marker(h.ll, { interactive: false, icon: L.divIcon({ className: 'hold-fix', html: `<span class="hold-fix__mk"></span><span class="hold-fix__txt">${h.id} · ${h.alt}ft</span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(procLayer);
+      L.marker(h.ll, { interactive: false, icon: L.divIcon({ className: 'hold-fix', html: `<span class="hold-fix__mk"></span><span class="hold-fix__txt">${h.id} 공중대기 · ${(h.alts || [h.alt]).slice().sort((a, b) => a - b).join('/')}ft</span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(procLayer);
+    });
+    // 시계비행 보고점(가상): 삼각형 표식
+    (M.VFR_POINTS || []).forEach(p => {
+      L.marker(p.ll, { interactive: false, icon: L.divIcon({ className: 'vrp', html: `<span class="vrp__mk"></span><span class="vrp__txt">${p.id}</span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(procLayer);
     });
     (M.HOLD_AREAS || []).forEach(a => {
       L.marker(a.ll, { interactive: false, icon: L.divIcon({ className: 'hold-label', html: `${a.id} 공중대기 <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);

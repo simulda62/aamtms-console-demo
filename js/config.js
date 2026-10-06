@@ -60,11 +60,25 @@ TMS.LOCATION_PRESETS = {
         { id: 'YHD', name: '영흥도', ll: [37.25607, 126.45903] },
       ],
       destinations: ['DIJ', 'SIJ', 'SBD', 'DJD', 'YHD'],
-      // 공중대기 공역(가상): 중심 버티포트에서 방위(도)·거리(m). serves 노선은 이 공역 기점을 지나 접근하며, stack은 노선별 대기 고도(ft).
-      holds: [
-        { id: 'HOLD-W', bearing: 230, dist: 3500, serves: ['DJD', 'SIJ', 'DIJ'], stack: [900, 1200, 1500] },
-        { id: 'HOLD-E', bearing: 130, dist: 3500, serves: ['SBD', 'YHD'], stack: [900, 1200] },
-      ],
+      // 자월도 시험장 시계비행(VFR) 국지절차(가상 예시). 좌표는 중심 버티포트 기준 [동, 북](m).
+      // 출항은 북·남 보고점, 입항은 서·동 보고점으로 나누어 출입항 흐름이 마주치지 않게 함. 공중대기는 입항 보고점 바깥 서·동 대기점.
+      vfr: {
+        points: { 'VRP-N': [0, 3000], 'VRP-S': [0, -3000], 'VRP-W': [-3000, 0], 'VRP-E': [4000, 0] },
+        gateDist: 1000, // 이륙 후 상승 지점·최종 접근점: 버티포트에서 1km
+        departures: { 'DEP-JAW-N': 'VRP-N', 'DEP-JAW-S': 'VRP-S' },
+        arrivals: {
+          'ARR-JAW-W': { vrp: 'VRP-W', hold: { id: 'HOLD-W', at: [-5000, 0], turn: 'R' } },
+          'ARR-JAW-E': { vrp: 'VRP-E', hold: { id: 'HOLD-E', at: [6000, 0], turn: 'R' } },
+        },
+        // 노선별 출항 절차·입항 절차·공중대기 고도(ft)
+        routes: {
+          DIJ: { dep: 'DEP-JAW-S', arr: 'ARR-JAW-W', holdAlt: 1500 },
+          SIJ: { dep: 'DEP-JAW-S', arr: 'ARR-JAW-W', holdAlt: 1200 },
+          DJD: { dep: 'DEP-JAW-N', arr: 'ARR-JAW-W', holdAlt: 900 },
+          SBD: { dep: 'DEP-JAW-S', arr: 'ARR-JAW-E', holdAlt: 900 },
+          YHD: { dep: 'DEP-JAW-N', arr: 'ARR-JAW-E', holdAlt: 1200 },
+        },
+      },
     },
   },
   jejucity:  { label: '제주시청', ll: [33.4996, 126.5312] },
