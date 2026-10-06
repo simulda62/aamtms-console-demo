@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AAM TMS 관제 (시안)</title>
+<!-- 시안은 외부에서 지도 라이브러리·웹 글꼴을 불러옴. 운영 환경(망 분리)에서는 라이브러리·지도 타일·글꼴 파일을 내부에 두어야 함. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/console.css">
+</head>
+<body data-view="main">
+
+<!-- 상단 표시줄 -->
+<header class="topbar">
+  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
+  <nav class="tabs" id="tabs"></nav>
+  <div class="top-right">
+    <span class="screen-pos" id="screen-pos" hidden></span>
+    <button type="button" class="top-btn" id="btn-multi" title="화면 역할을 모니터별로 나누어 엶">멀티모니터</button>
+    <button type="button" class="top-btn top-btn--icon" id="btn-fullscreen" title="전체 화면">⛶</button>
+    <button type="button" class="top-btn" id="btn-demo" title="가상 상황 주입">시안 제어</button>
+    <div class="seg seg--sm lang-toggle" id="lang-toggle" title="표시 언어"><button type="button" data-lang="ko">KO</button><button type="button" data-lang="en">EN</button></div>
+    <span class="demo-flag"><i></i>시안 데이터</span>
+    <span class="avatar" title="관제 요원(시안)">관</span>
+  </div>
+</header>
+
+<!-- 좌측 아이콘 막대 -->
+<nav class="rail" id="rail">
+  <button type="button" data-rail="assets" title="기체 목록 열기·닫기">
+    <svg viewBox="0 0 20 20"><path d="M5 5.5h11l-2 9H3z"/></svg>
+  </button>
+  <button type="button" data-rail="detail" title="기체·판정">
+    <svg viewBox="0 0 20 20"><path d="M4 5h2M4 10h2M4 15h2M8.5 5H16M8.5 10H16M8.5 15H16"/></svg>
+  </button>
+  <button type="button" data-rail="events" title="경보·시스템">
+    <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M10 6.5V10l2.5 1.8"/></svg>
+    <span class="rail-badge" id="rail-badge" hidden></span>
+  </button>
+  <button type="button" data-rail="map" title="상황 지도">
+    <svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13"/><path d="M3.5 8l4.5-4.5M3.5 13l9.5-9.5M6.5 16.5l10-10M11.5 16.5l5-5"/></svg>
+  </button>
+</nav>
+
+<!-- 기본 상태 표시 (박스 구성은 이전 시안과 같음) -->
+<div class="statusline">
+  <span class="mode-badge mode--live" id="mode-badge"><i></i>실시간</span>
+  <span class="chip" id="chip-feed" title="조회 API로부터 판정 결과 수신 상태">판정 결과<b>—</b></span>
+  <span class="chip" id="chip-adsb">ADS-B 수신기<b>—</b></span>
+  <span class="chip" id="chip-lora">LoRa 수신기<b>—</b></span>
+  <span class="chip" id="chip-sig" title="수신 메시지 서명 검증">서명 검증<b>—</b></span>
+  <span class="chip" title="적용 중인 정책 버전">정책<b class="mono">POL-가상-0.3</b></span>
+  <span class="chip" id="chip-peers" title="연동된 화면 창 수">연동 창<b>1개</b></span>
+  <span class="clock"><b class="mono" id="clock-kst">--:--:--</b> KST <b class="mono" id="clock-utc">--:--:--</b> UTC</span>
+</div>
+
+<main class="layout">
+  <!-- 기체 목록 -->
+  <section class="pane pane-list" id="pane-list" aria-label="기체 목록">
+    <div class="pane-head">
+      <h2>기체 <span class="count" id="asset-count">0</span></h2>
+      <button type="button" class="icon-btn" id="assets-collapse" title="목록 닫기">‹</button>
+    </div>
+    <label class="search">
+      <svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.5 12.5l4 4"/></svg>
+      <input type="text" id="asset-search" placeholder="기체 검색..." autocomplete="off">
+      <kbd>/</kbd>
+    </label>
+    <div class="list-tools">
+      <div class="seg seg--sm" id="list-filter">
+        <button type="button" data-f="all" class="is-on">전체</button>
+        <button type="button" data-f="real">실기체</button>
+        <button type="button" data-f="virtual">가상기체</button>
+      </div>
+    </div>
+    <div class="list-summary" id="list-summary"></div>
+    <div class="list-body" id="list-body"></div>
+    <div class="pane-foot">
+      <span><i class="dot dot--live"></i>가상 데이터</span>
+      <span class="mono" id="foot-clock">--:--:-- UTC</span>
+    </div>
+  </section>
+
+  <!-- 상황 지도 -->
+  <section class="pane pane-map" id="pane-map" aria-label="상황 지도">
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="cop-chip">상황 지도<span>시안</span></div>
+      <div class="map-note">가상 예시 절차 · 좌표 임의값</div>
+      <div class="alert-strip" id="alert-strip"></div>
+
+      <div class="map-ctl">
+        <button type="button" class="ctl-btn ctl-btn--text" id="btn-assets" title="기체 목록">
+          <svg viewBox="0 0 20 20"><path d="M5 5.5h11l-2 9H3z"/></svg>기체
+        </button>
+        <div class="ctl-row">
+          <div class="layer-panel" id="layer-panel">
+            <h4>배경</h4>
+            <label><input type="radio" name="basemap" value="satellite"> 위성</label>
+            <label><input type="radio" name="basemap" value="dark"> 일반</label>
+            <label><input type="radio" name="basemap" value="grid"> 격자(망 분리 모사)</label>
+            <h4>표시</h4>
+            <label><input type="checkbox" id="lyr-label" checked> 기체 라벨</label>
+            <label><input type="checkbox" id="lyr-proc" checked> 절차</label>
+            <label><input type="checkbox" id="lyr-trail" checked> 항적(60초)</label>
+            <label><input type="checkbox" id="lyr-raw" checked> 원시 수신점</label>
+            <label><input type="checkbox" id="lyr-virtual" checked> 가상기체</label>
+            <button type="button" class="btn btn--sm btn--block" id="btn-fit">처음 위치</button>
+          </div>
+          <div class="ctl-col">
+            <button type="button" class="ctl-btn" id="zoom-in" title="확대">+</button>
+            <button type="button" class="ctl-btn" id="zoom-out" title="축소">−</button>
+            <button type="button" class="ctl-btn" id="btn-follow" title="선택 기체 따라가기 (F)">
+              <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="4"/><path d="M10 2v4M10 14v4M2 10h4M14 10h4"/></svg>
+            </button>
+            <button type="button" class="ctl-btn is-on" id="btn-layers" title="배경·표시">
+              <svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12"/><path d="M4 9l5-5M4 14l10-10M9 16l7-7M14 16l2-2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="gauges" id="gauges"></div>
+      <div class="map-legend">
+        <span><i class="lg lg--normal"></i>정상</span>
+        <span><i class="lg lg--caution"></i>주의</span>
+        <span><i class="lg lg--warning"></i>경고</span>
+        <span><i class="lg lg--emergency"></i>비상</span>
+        <span><i class="lg lg--nodata"></i>정보 없음</span>
+        <span><i class="lg lg--virtual"></i>가상기체</span>
+        <span><i class="lg lg--adsb"></i>ADS-B</span>
+        <span><i class="lg lg--tlm"></i>텔레메트리</span>
+      </div>
+    </div>
+    <div class="map-bar">
+      <span class="mono" id="cursor-ll">—</span>
+      <span class="map-bar__right" id="conn-state">—</span>
+    </div>
+  </section>
+
+  <!-- 기체 상세 -->
+  <section class="pane pane-detail" id="pane-detail" aria-label="기체 상세">
+    <div class="detail" id="detail"></div>
+  </section>
+
+  <!-- 경보·이벤트 -->
+  <section class="pane pane-events" id="pane-events" aria-label="경보·이벤트">
+    <div class="pane-head">
+      <h2>경보·이벤트 <span class="count count--alert" id="events-unacked">0</span><small>미확인</small></h2>
+      <div class="seg seg--sm" id="events-filter">
+        <button type="button" data-f="all" class="is-on">전체</button>
+        <button type="button" data-f="unacked">미확인</button>
+        <button type="button" data-f="selected">선택 기체</button>
+      </div>
+    </div>
+    <div class="events-body" id="events-body"></div>
+  </section>
+
+  <!-- 시스템·버전 -->
+  <section class="pane pane-system" id="pane-system" aria-label="시스템 상태">
+    <div class="pane-head"><h2>시스템·버전</h2></div>
+    <div class="system-body" id="system"></div>
+  </section>
+</main>
+
+<!-- 재생 막대 -->
+<footer class="timeline" id="timeline"></footer>
+
+<!-- 멀티모니터 구성 -->
+<div class="modal" id="modal-multi" hidden>
+  <div class="modal__box" role="dialog" aria-labelledby="mm-title">
+    <div class="eyebrow">화면 구성</div>
+    <h2 id="mm-title">멀티모니터</h2>
+    <p class="modal__lead">화면 역할을 모니터별로 나누어 엶. 이 창은 화면 1이 됨.</p>
+    <div id="multi-body"></div>
+    <div class="modal__foot">
+      <button type="button" class="btn mm-close-all" id="mm-close-all" hidden>연동 창 모두 닫기</button>
+      <button type="button" class="btn" id="mm-cancel">취소</button>
+      <button type="button" class="btn btn--primary" id="mm-open">창 열기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 시안 제어 -->
+<aside class="demo" id="demo-panel" hidden>
+  <div class="demo__head"><span class="eyebrow">시안 제어</span><button type="button" class="icon-btn" id="demo-close" aria-label="닫기">✕</button></div>
+  <p class="hint">가상 상황 주입. 실시간에서만 동작하며 모든 연동 창에 적용됨.</p>
+  <label class="demo__row"><input type="checkbox" id="demo-feed"> 판정 결과 수신 중단</label>
+  <div class="demo__row">대상 기체 <select id="demo-ac"></select></div>
+  <div class="demo__row">
+    <button type="button" class="btn" id="demo-loss">수신 두절 10초</button>
+    <button type="button" class="btn" id="demo-sig">서명 검증 실패 10초</button>
+  </div>
+  <div class="demo__script">
+    <b>각본 (240초 주기, 현재 <span id="demo-cycle">-</span>)</b>
+    <ul>
+      <li>R01 텔레메트리 두절 20–35초 · 주의</li>
+      <li>V01 경로 이탈 60–100초 · 주의→경고</li>
+      <li>V03 강하율 100–118초 · 경고→비상</li>
+      <li>R01 ADS-B 위치 불일치 130–150초 · 경고</li>
+      <li>V02 수신 두절 170–182초 · 정보 없음</li>
+      <li>V04 속도 초과 200–225초 · 주의</li>
+    </ul>
+  </div>
+</aside>
+
+<div class="toast" id="toast" hidden></div>
+<div class="closed-overlay">연동 창 종료 요청을 받음. 이 창은 닫아도 됨.</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/config.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/mock_source.js"></script>
+<script src="js/store.js"></script>
+<script src="js/map_view.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

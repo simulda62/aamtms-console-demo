@@ -1,0 +1,327 @@
+// AAM TMS 관제 화면 시안 - 표시 언어(한국어/영어)
+// 화면 코드는 한국어 문구로 작성하고, 영어 선택 시 화면에 그려진 글자를 번역표로 바꿈.
+// 언어 선택: 주소 ?lang=en|ko 우선, 없으면 이 브라우저에 저장된 선택, 기본은 영어.
+(function () {
+  const params = new URLSearchParams(location.search);
+  let lang = params.get('lang');
+  try { if (!lang) lang = localStorage.getItem('aamtms.lang'); } catch (e) { /* 저장소 사용 불가 시 기본값 */ }
+  lang = lang === 'ko' ? 'ko' : 'en';
+
+  // 긴 문구가 먼저 맞도록 길이순으로 적용함
+  const DICT = {
+    // 문장
+    '목록·지도에서 기체를 선택하거나 ↑/↓ 키로 이동하면 판정 근거, 수신 경로, 절차·구간, 판정 버전, 병행 운용 기록을 표시함.': 'Select an aircraft in the list or on the map (or use ↑/↓) to see verdict basis, path comparison, procedure, versions and the parallel-ops log.',
+    '선택 기체, 재생 시점, 경보 확인, 병행 운용 기록은 모든 창에 동기화됨. 브라우저가 팝업을 막으면 주소창에서 팝업을 허용하거나': 'Selection, replay position, acknowledgements and the parallel-ops log are synced across windows. If pop-ups are blocked, allow them or press',
+    '이 브라우저는 화면 배치 기능을 지원하지 않음(Chromium 계열 필요). 창을 연 뒤 수동으로 옮길 것.': 'This browser cannot place windows on monitors (Chromium required). Move the windows manually after opening.',
+    '지도 라이브러리를 불러오지 못함. 외부 연결을 확인할 것(운영 환경에서는 라이브러리를 내장해야 함).': 'Map library failed to load. Check connectivity (production builds must bundle it).',
+    '가상기체는 무선 구간을 거치지 않고 입력단에 같은 형식으로 주입됨.': 'Virtual aircraft are injected at the input in the same format, bypassing the radio link.',
+    '경과함. 오래된 값을 최신처럼 보이지 않도록 판정 값을 숨김.': 'ago. Verdict values are hidden so stale data never looks current.',
+    '현재 구간은 판정 엔진이 절차의 전환 기준으로 판별한 결과임.': 'The current segment is determined by the verdict engine from the procedure transition criteria.',
+    '모든 기체를 정보 없음으로 표시함. 화면의 값은 최신이 아님.': 'All aircraft shown as NO DATA. Values on screen are not current.',
+    '가상 상황 주입. 실시간에서만 동작하며 모든 연동 창에 적용됨.': 'Inject simulated events. Live mode only; applies to all linked windows.',
+    '화면 역할을 모니터별로 나누어 엶. 이 창은 화면 1이 됨.': 'Open each screen role on its own monitor. This window becomes screen 1.',
+    '병행 운용 판단을 기록함(시안: 화면 메모리에만 저장).': 'Parallel-ops entry logged (demo: kept in memory only).',
+    '기록 시점의 시스템 판정과 판정 버전을 함께 저장함.': 'Stores the system verdict and versions at the time of logging.',
+    '모니터 배치 정보 없음: 창을 연 뒤 각 모니터로 옮기고': 'No monitor layout info: after opening, move each window to its monitor and press',
+    '모니터 정보 접근이 허용되지 않음. 수동 배치로 진행함.': 'Monitor access was not granted. Continuing with manual placement.',
+    '지도 타일을 불러오지 못함. 외부 연결이 없으면 배경을': 'Map tiles failed to load. Without internet, switch the basemap to',
+    '가상 예시 절차 · 좌표 임의값': 'Virtual example procedures · arbitrary coordinates',
+    '경로별 수신 기체 비율 · A: ADS-B · T: 텔레메트리': 'Share of aircraft received per path · A: ADS-B · T: Telemetry',
+    '판정 엔진 결과 표시 · 한계값은 절차·정책 데이터': 'engine output · limits from procedure/policy data',
+    '연동 창 종료 요청을 받음. 이 창은 닫아도 됨.': 'Close request received. You may close this window.',
+    '일치율 평가는 기록 서비스에서 수행함.': 'Agreement rate is evaluated by the recording service.',
+    '연동 창 모두 닫기': 'Close linked windows',
+    '개가 차단됨. 팝업을 허용하거나': ' blocked. Allow pop-ups or use',
+    '로 하나씩 열 것. 모두 연 뒤': ' one by one, then press',
+    '조회 API로부터 판정 결과 수신 상태': 'Verdict feed status from the query API',
+    '텔레메트리 두절, ADS-B로 감시 지속': 'telemetry lost, monitoring continues on ADS-B',
+    '텔레메트리 두절, ADS-B 단독 감시': 'Telemetry lost, ADS-B only',
+    '화면 역할을 모니터별로 나누어 엶': 'Open each screen role on its own monitor',
+    '재생 중에는 기록할 수 없음.': 'Logging is disabled during replay.',
+    '기준 값이며 최신이 아님': 'values, not current',
+    '를 화면별로 누를 것.': ' per screen.',
+    '을 누를 것.': '.',
+    '을 누를 것': '',
+    '공유 링크에서는 외부 지도 타일을 쓸 수 없음': 'External map tiles are unavailable on the shared link',
+    '실패 발생': 'Failure',
+    '표시 언어': 'Display language',
+    '로 바꿀 것.': '.',
+    // 화면 요소
+    'LoRa 전용 링크': 'dedicated LoRa link',
+    '서명 검증': 'Signature',
+    '저신뢰': 'low trust',
+    '마지막 수신 값 보기(참고)': 'Show last received values (reference)',
+    '마지막 수신 값 숨기기': 'Hide last received values',
+    '서명 검증 실패 메시지 폐기': 'signature failed, message dropped',
+    '수신 두절 10초 모사': 'signal loss simulated (10 s)',
+    '서명 검증 실패 10초 모사': 'signature failure simulated (10 s)',
+    '이 기체의 경보·이력 보기': 'View alerts for this aircraft',
+    '시스템 판정과 나란히 기록': 'logged next to the system verdict',
+    '선택 기체 따라가기 (F)': 'Follow selected (F)',
+    '일시정지·재개 (Space)': 'Pause / resume (Space)',
+    '재생 시점(최근 30분)': 'Replay position (last 30 min)',
+    '재생 중 · 실시간 아님': 'REPLAY · NOT LIVE',
+    '수신 메시지 서명 검증': 'Signature check on received messages',
+    '격자(망 분리 모사)': 'Grid (offline)',
+    '기체 목록 열기·닫기': 'Show / hide aircraft list',
+    '마지막 유효 수신 후': 'Last valid data',
+    '모니터 정보 가져오기': 'Detect monitors',
+    '병행 운용 판단 기록': 'PARALLEL-OPS LOG',
+    '연동된 다른 창 없음': 'No other linked windows',
+    '이 기체의 기록 없음': 'No entries for this aircraft',
+    '이동 구간(절차 외)': 'Transit (off-procedure)',
+    '적용 중인 정책 버전': 'Active policy version',
+    '판정 결과 수신 두절': 'Verdict feed lost',
+    '판정 결과 수신 중단': 'Stop verdict feed',
+    '판정 기록 버전·서명': 'VERSIONS & SIGNATURE',
+    '중단접근·전환 수행': 'Go-around / transition',
+    '각본 (240초 주기, 현재': 'Script (240 s cycle, now',
+    '연동된 화면 창 수': 'Linked windows',
+    '서명 검증 실패 10초': 'Signature fail 10 s',
+    '관제 요원(시안)': 'Operator (demo)',
+    '규칙 · 요구사항': 'rule · requirement',
+    '대응표 미입력': 'Mapping table not set',
+    '마지막 유효 수신': 'Last valid',
+    '수신 두절 10초': 'Signal loss 10 s',
+    '지도에서 따라가기': 'Follow on map',
+    '통신·데이터 상태': 'Link & data',
+    '실증기 · 유인': 'Demonstrator · crewed',
+    '실증기(유인)': 'Demonstrator (crewed)',
+    '가상 상황 주입': 'Inject simulated events',
+    '가상 예시 절차': 'virtual example',
+    '경로 간 불일치': 'Path mismatch',
+    '경로 간 위치 차': 'Path offset',
+    '기체·판정·경보': 'Aircraft & Alerts',
+    '는 저신뢰 입력': ' is low-trust input',
+    '단일 경로 감시': 'Single-path monitoring',
+    '병행 운용 기록': 'PARALLEL-OPS LOG',
+    '서명 검증 실패': 'Signature failed',
+    '서명 검증 통과': 'Signature passed',
+    '수신 경로 대조': 'PATH COMPARISON',
+    '수신 이력 없음': 'No data received',
+    '미확인 경보 없음': 'No unacknowledged alerts',
+    '표시할 이벤트 없음': 'No events',
+    '이 화면만 열기': 'Open this only',
+    '일치 / 불일치': 'Match / mismatch',
+    '정보 없음 기준': 'No-data threshold',
+    '텔레메트리 두절': 'telemetry loss',
+    '판정 결과 두절': 'Verdict feed lost',
+    '판정 결과 수신': 'Verdict feed',
+    '확인 필요 상태': 'Ack required for',
+    '기체 간 간격': 'Separation',
+    '두 경로 정상': 'Both paths OK',
+    '재생 일시정지': 'Replay paused',
+    '절차 (가상)': 'Procedure (virtual)',
+    '초 (초기값)': ' s (initial value)',
+    '항적(60초)': 'Trails (60 s)',
+    '건 더 있음': ' more',
+    '경로 간 차': 'path offset',
+    '실시간 연결': 'LIVE CONNECTION',
+    '원시 수신점': 'Raw fixes',
+    '위치 불일치': 'position mismatch',
+    '이 창 전환': 'Switch this window',
+    '모니터 2대': '2 monitors',
+    '모니터 3대': '3 monitors',
+    '시각 (KST)': 'Time (KST)',
+    '실시간 (L)': 'Live (L)',
+    '경보·시스템': 'Alerts & System',
+    '경보·이벤트': 'ALERTS & EVENTS',
+    '기체 데이터': 'AIRCRAFT DATA',
+    '데이터 연결': 'DATA LINK',
+    '데이터 이상': 'data anomaly',
+    '데이터 출처': 'Data source',
+    '마지막 수신': 'Last updated',
+    '메모(선택)': 'Note (optional)',
+    '메시지 폐기': 'message dropped',
+    '미확인 경보': 'Unacked alerts',
+    '시스템 상태': 'System status',
+    '시스템·버전': 'SYSTEM & VERSIONS',
+    '시안 데이터': 'DEMO DATA',
+    '가상 데이터': 'SIMULATED DATA',
+    '판정 재현용': 'for replay',
+    '경로 이탈': 'Path deviation',
+    '고도 편차': 'Altitude deviation',
+    '관제 요원': 'Operator',
+    '규칙 구성': 'Rule set',
+    '기본 모드': 'Single screen',
+    '기체 검색': 'Search aircraft',
+    '기체 라벨': 'Aircraft labels',
+    '기체 목록': 'Aircraft list',
+    '기체 상세': 'Aircraft detail',
+    '기체·판정': 'Aircraft',
+    '내부 관제': 'Internal Ops',
+    '대상 기체': 'Target',
+    '멀티모니터': 'Multi-monitor',
+    '목록 닫기': 'Close list',
+    '배경·표시': 'Basemap & layers',
+    '상태 변화': 'Change',
+    '상황 개요': 'OVERVIEW',
+    '상황 지도': 'Map',
+    '선택 기체': 'Selected',
+    '선택 해제': 'Deselect',
+    '속도 범위': 'Speed range',
+    '속도 초과': 'overspeed',
+    '수동 배치': 'Manual',
+    '수신 두절': 'Signal loss',
+    '시안 제어': 'Demo controls',
+    '연동 화면': 'LINKED SCREENS',
+    '운항 요약': 'FLIGHT SUMMARY',
+    '원인 항목': 'Cause',
+    '위치 융합': 'Fusion',
+    '위치·고도': 'Position / alt',
+    '이전 이력': 'Earlier',
+    '재생 배속': 'Replay speed',
+    '적용 버전': 'ACTIVE VERSIONS',
+    '전체 화면': 'Full screen',
+    '절차·구간': 'Procedure',
+    '정보 없음': 'No data',
+    '지상 대기': 'on ground',
+    '진행 방향': 'Heading',
+    '처음 위치': 'Reset view',
+    '텔레메트리': 'Telemetry',
+    '판정 근거': 'VERDICT BASIS',
+    '판정 결과': 'Verdict feed',
+    '판정 시각': 'Verdict at',
+    '표시 규칙': 'DISPLAY RULES',
+    '항적 길이': 'Trail length',
+    '화면 구성': 'SCREEN LAYOUT',
+    '환경 조건': 'Environment',
+    '착륙장 상태': 'Vertiport status',
+    '일정 준수': 'Schedule',
+    '가상 주입': 'Simulated injection',
+    '가상기체': 'Virtual',
+    '대 감지': ' detected',
+    '로 이동': ' (seek)',
+    '수신 중': 'Receiving',
+    '수신기': 'receiver',
+    '수직속도': 'Vertical speed',
+    '연동 창': 'Linked',
+    '일시정지': 'PAUSED',
+    '창 열기': 'Open windows',
+    '초 뒤로': ' s back',
+    '초 전 수신': 's ago',
+    '초 전': 's ago',
+    '확인 중': 'pending',
+    '참고: ': 'Reference: ',
+    '(주)': '(primary)',
+    '이 창': 'this window',
+    '강하율': 'Descent rate',
+    '모니터': 'Monitor',
+    '미등록': 'unregistered',
+    '미적용': 'N/A',
+    '미확인': 'Unacked',
+    '불일치': 'Mismatch',
+    '시스템': 'System',
+    '실기체': 'Real',
+    '실시간': 'LIVE',
+    '측정값': 'Value',
+    '가상': 'Virtual',
+    '격자': 'Grid',
+    '경고': 'Warning',
+    '경과': 'elapsed',
+    '경로': 'Path',
+    '고도': 'Altitude',
+    '관제': 'Ops',
+    '기록': 'Log',
+    '기본': 'Overview',
+    '기체': 'Aircraft',
+    '닫기': 'Close',
+    '두절': 'Lost',
+    '배경': 'BASEMAP',
+    '비교': 'Compare',
+    '비상': 'Emergency',
+    '상태': 'Status',
+    '속도': 'Speed',
+    '수신': 'Rx',
+    '시각': 'Time',
+    '시안': 'DEMO',
+    '실패': 'Failed',
+    '역할': 'Role',
+    '위성': 'Satellite',
+    '위치': 'Location',
+    '응답': '',
+    '이상': 'Fault',
+    '일반': 'Street',
+    '일치': 'Match',
+    '재생': 'Replay',
+    '전체': 'All',
+    '절차': 'Procedure',
+    '접근': 'Approach',
+    '정상': 'Normal',
+    '정책': 'Policy',
+    '주의': 'Caution',
+    '참고': 'Reference',
+    '출발': 'Departure',
+    '취소': 'Cancel',
+    '통과': 'Passed',
+    '팝업': 'Pop-ups',
+    '표시': 'DISPLAY',
+    '항목': 'Item',
+    '해제': 'Cleared',
+    '현재': 'Now',
+    '화면': 'Screen',
+    '확대': 'Zoom in',
+    '축소': 'Zoom out',
+    '확인': 'Ack',
+    '모사': 'simulated',
+    '마지막': 'last',
+    '관': 'OP',
+    '개': '',
+    '건': '',
+    '대': '',
+    '분': ' min',
+    '초': 's',
+  };
+  const keys = Object.keys(DICT).sort((a, b) => b.length - a.length);
+  const RE = new RegExp(keys.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  const HANGUL = /[가-힣]/;
+  const ATTRS = ['title', 'placeholder', 'aria-label'];
+
+  function t(s) {
+    if (lang !== 'en' || !s || !HANGUL.test(s)) return s;
+    return s.replace(RE, m => DICT[m]);
+  }
+  function fixText(n) {
+    const v = n.nodeValue;
+    if (!HANGUL.test(v)) return;
+    const nv = t(v);
+    if (nv !== v) n.nodeValue = nv;
+  }
+  function fixAttrs(el) {
+    ATTRS.forEach(a => {
+      const v = el.getAttribute(a);
+      if (v && HANGUL.test(v)) { const nv = t(v); if (nv !== v) el.setAttribute(a, nv); }
+    });
+  }
+  function walk(node) {
+    if (node.nodeType === 3) { fixText(node); return; }
+    if (node.nodeType !== 1) return;
+    fixAttrs(node);
+    const tw = document.createTreeWalker(node, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    let n = tw.nextNode();
+    while (n) { if (n.nodeType === 3) fixText(n); else fixAttrs(n); n = tw.nextNode(); }
+  }
+
+  function start() {
+    document.documentElement.lang = lang;
+    document.body.classList.toggle('lang-en', lang === 'en');
+    if (lang !== 'en') return;
+    walk(document.body);
+    new MutationObserver(muts => {
+      muts.forEach(m => {
+        if (m.type === 'characterData') fixText(m.target);
+        else if (m.type === 'attributes') fixAttrs(m.target);
+        else m.addedNodes.forEach(walk);
+      });
+    }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+  }
+
+  function setLang(l) {
+    try { localStorage.setItem('aamtms.lang', l); } catch (e) { /* 저장 불가 시 주소로만 전달 */ }
+    const p = new URLSearchParams(location.search);
+    p.set('lang', l);
+    location.search = p.toString();
+  }
+
+  TMS.i18n = { get lang() { return lang; }, t, start, setLang };
+})();
