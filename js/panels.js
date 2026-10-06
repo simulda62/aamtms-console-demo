@@ -532,10 +532,10 @@
     const approaching = arrivals.filter(r => arrState(r).k === 'active').length;
     const atPad = departures.filter(r => now >= r.tPad && now < r.tEvent && !nodata(r.ac)).length;
     $('#sched-sum').innerHTML = kv([
-      ['다음 입항', nextArr ? `${nextArr.ac} ${hm(nextArr.tEvent)}` : '—'],
-      ['접근 중', `${approaching}`],
-      ['패드 대기', `${atPad}`],
       ['다음 출항', nextDep ? `${nextDep.ac} ${hm(nextDep.tEvent)}` : '—'],
+      ['패드 대기', `${atPad}`],
+      ['접근 중', `${approaching}`],
+      ['다음 입항', nextArr ? `${nextArr.ac} ${hm(nextArr.tEvent)}` : '—'],
     ]);
   }
 

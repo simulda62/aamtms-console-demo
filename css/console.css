@@ -191,10 +191,10 @@ body[data-view="detail_events"] .pane-map, body[data-view="detail_events"] .pane
 /* 운항일정 */
 .pane-sched-head, .pane-arr, .pane-dep { display: none; }
 .pane-sched-head { grid-area: shead; } .pane-arr { grid-area: arr; } .pane-dep { grid-area: dep; }
-body[data-view="flightplan"] .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "shead shead" "arr dep"; }
+body[data-view="flightplan"] .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "shead shead" "dep arr"; }
 body[data-view="flightplan"] .pane:not(.pane-sched-head):not(.pane-arr):not(.pane-dep) { display: none; }
 body[data-view="flightplan"] .pane-sched-head, body[data-view="flightplan"] .pane-arr, body[data-view="flightplan"] .pane-dep { display: flex; }
-body.assets-closed[data-view="flightplan"] .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "shead shead" "arr dep"; }
+body.assets-closed[data-view="flightplan"] .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "shead shead" "dep arr"; }
 
 /* 기체 목록 닫기 */
 body.assets-closed .pane-list { display: none; }
