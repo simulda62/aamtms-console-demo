@@ -466,7 +466,7 @@
   let schedSel;
   function bindSchedule() {
     const seg = $('#sched-vp');
-    seg.innerHTML = M.VERTIPORTS.map(v => `<button type="button" data-vp="${v.id}">${v.id} <em class="tag tag--virtual">가상</em></button>`).join('');
+    seg.innerHTML = M.VERTIPORTS.map(v => `<button type="button" data-vp="${v.id}">${M.vpName(v.id)}</button>`).join('') + ' <em class="tag tag--virtual">가상</em>';
     seg.addEventListener('click', e => { const b = e.target.closest('[data-vp]'); if (b) { schedVp = b.dataset.vp; schedAt = 0; } });
     ['#arr-body', '#dep-body'].forEach(s => $(s).addEventListener('click', e => {
       const tr = e.target.closest('tr[data-ac]');
@@ -514,7 +514,7 @@
           <td class="t-plan">${hm(r.plan)}</td>
           <td>${hideEst ? '<span class="muted">—</span>' : `<span class="t-est">${hm(r.tEvent)}</span>${diffTag(r.plan, r.tEvent)}`}</td>
           <td><span class="ev-ac">${diamond(`dia--${s.k === 'past' ? 'normal' : st}${r.virtual ? ' dia--virtual' : ''}`)}<b>${r.ac}</b>${r.virtual ? '<em class="tag tag--virtual">가상</em>' : '<em class="tag tag--real">실기체</em>'}</span></td>
-          <td>${r[placeKey]}</td>
+          <td>${M.vpName(r[placeKey])}</td>
           <td class="mono">${r.proc}</td>
           <td><span class="sched-st sched-st--${s.k}">${s.label}</span></td>
           <td>${s.k === 'active' || s.k === 'nodata' ? stTag(st) : '<span class="muted">—</span>'}</td></tr>`;

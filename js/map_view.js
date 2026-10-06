@@ -66,7 +66,10 @@
   }
 
   function init(el) {
-    map = L.map(el, { zoomControl: false, attributionControl: true, minZoom: 9 }).setView(C.MAP_CENTER, C.MAP_ZOOM);
+    map = L.map(el, { zoomControl: false, attributionControl: true, minZoom: 9, zoomSnap: 0.25 }).setView(C.MAP_CENTER, C.MAP_ZOOM);
+    // 넓게 볼 때는 절차 이름을 숨겨 겹침을 줄임
+    const syncZoomClass = () => map.getContainer().classList.toggle('zoom-far', map.getZoom() < 12.5);
+    map.on('zoomend', syncZoomClass);
     L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
     map.attributionControl.setPrefix('Leaflet');
 
@@ -84,11 +87,11 @@
       p.ll.slice(1, -1).forEach(ll => {
         L.circleMarker(ll, { radius: 2.5, color: COLORS.proc, weight: 1, opacity: 0.6, fillColor: '#111', fillOpacity: 1, interactive: false }).addTo(procLayer);
       });
-      const mid = p.ll[Math.floor(p.ll.length / 2) - 1];
+      const mid = p.ll[Math.floor(p.segCount / 2)];
       L.marker(mid, { interactive: false, icon: L.divIcon({ className: 'proc-label', html: `${p.id} <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);
     });
     M.VERTIPORTS.forEach(v => {
-      L.marker(v.ll, { interactive: false, icon: L.divIcon({ className: 'vp-icon', html: `<div class="vp">H</div><div class="vp__label">${v.id} <i>가상</i></div>`, iconSize: [20, 20], iconAnchor: [10, 10] }) }).addTo(procLayer);
+      L.marker(v.ll, { interactive: false, icon: L.divIcon({ className: 'vp-icon', html: `<div class="vp">H</div><div class="vp__label">${v.name || v.id} <i>가상</i></div>`, iconSize: [20, 20], iconAnchor: [10, 10] }) }).addTo(procLayer);
     });
 
     M.AIRCRAFT.forEach(ac => {
@@ -106,6 +109,7 @@
     // 배경 지도는 열 때마다 위성으로 시작함(이전 선택을 기억하지 않음)
     setBasemap('satellite');
     fitAll();
+    syncZoomClass();
     map.on('mousemove', e => {
       const c = document.getElementById('cursor-ll');
       if (c) c.textContent = `${e.latlng.lat.toFixed(5)}° N · ${e.latlng.lng.toFixed(5)}° E`;

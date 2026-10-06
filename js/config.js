@@ -12,8 +12,9 @@ TMS.config = {
   TRAIL_SEC: 60,
   // 재생 가능 범위(초). 시안에서는 최근 30분.
   REPLAY_WINDOW_SEC: 1800,
-  // 시안 각본 반복 주기(초). 경보가 지나치게 잦지 않도록 10분으로 둠.
-  SCENARIO_CYCLE_SEC: 600,
+  // 시연 상황 무작위 발생: 기체마다 SLOT초 단위로 PROB 확률로 이상 상황 1건(확인 필요 경보 시간당 15건 안팎)
+  SCENARIO_SLOT_SEC: 60,
+  SCENARIO_EVENT_PROB: 0.07,
   // 지도 기준 위치(아래 TMS.LOCATION에서 정함). 가상 절차·버티포트는 이 점을 기준으로 한 상대 좌표(임의값)임.
   MAP_CENTER: null,
   MAP_ZOOM: 13,
@@ -33,7 +34,22 @@ TMS.LOCATION_PRESETS = {
   seongsan:  { label: '성산일출봉', ll: [33.4581, 126.9425], shift: [-4000, 0] },
   jeongseok: { label: '정석비행장', ll: [33.3964, 126.7119] },
   // 자월도 비행시험장(인천 옹진군). 좌표는 사용자 지정(2026-10-06).
-  jawoldo:   { label: '자월도 비행시험장', ll: [37.26146, 126.29088] },
+  // network: 시험장과 주변 섬을 잇는 가상 노선망. 섬 버티포트 위치는 OpenStreetMap 섬 중심 좌표를 쓴 가상 위치임.
+  jawoldo:   {
+    label: '자월도 비행시험장', ll: [37.26146, 126.29088],
+    network: {
+      hub: 'JAW',
+      vertiports: [
+        { id: 'JAW', name: '자월도', ll: [37.26146, 126.29088] },
+        { id: 'DIJ', name: '대이작도', ll: [37.16978, 126.26513] },
+        { id: 'SIJ', name: '소이작도', ll: [37.18273, 126.23516] },
+        { id: 'SBD', name: '승봉도', ll: [37.16684, 126.30597] },
+        { id: 'DJD', name: '덕적도', ll: [37.24188, 126.11559] },
+        { id: 'YHD', name: '영흥도', ll: [37.25607, 126.45903] },
+      ],
+      destinations: ['DIJ', 'SIJ', 'SBD', 'DJD', 'YHD'],
+    },
+  },
   jejucity:  { label: '제주시청', ll: [33.4996, 126.5312] },
 };
 TMS.DEFAULT_LOCATION = 'seongsan';
@@ -50,11 +66,11 @@ TMS.LOCATION = (function () {
     const saved = JSON.parse(localStorage.getItem('aamtms.loc') || 'null');
     if (saved && valid(saved.ll[0], saved.ll[1])) {
       const p = TMS.LOCATION_PRESETS[saved.key];
-      return p ? { key: saved.key, ll: p.ll.slice(), shift: p.shift } : { key: 'custom', ll: saved.ll };
+      return p ? { key: saved.key, ll: p.ll.slice(), shift: p.shift, network: p.network } : { key: 'custom', ll: saved.ll };
     }
   } catch (e) { /* 저장소 사용 불가 시 기본 위치 */ }
   const p = TMS.LOCATION_PRESETS[TMS.DEFAULT_LOCATION];
-  return { key: TMS.DEFAULT_LOCATION, ll: p.ll.slice(), shift: p.shift };
+  return { key: TMS.DEFAULT_LOCATION, ll: p.ll.slice(), shift: p.shift, network: p.network };
 })();
 TMS.config.MAP_CENTER = TMS.LOCATION.ll;
 

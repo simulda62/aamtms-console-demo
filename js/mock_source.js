@@ -17,77 +17,105 @@
 
   const VERSIONS = { policy: 'POL-가상-0.3', ruleset: 'RULESET-가상-0.1' };
 
-  // 가상 버티포트 (위치 임의)
-  const VERTIPORTS = [
-    { id: 'VP-A', e: -2500, n: 600 },
-    { id: 'VP-B', e: 2800, n: -900 },
-  ].map(v => {
-    const e = v.e + SHIFT[0], n = -v.n + SHIFT[1];
-    return { ...v, e, n, ll: toLL(e, n) };
-  });
-
-  // 가상 예시 절차. 경로점 [동(m), 북(m), 고도(ft)]. 구간 i = 경로점 i → i+1.
-  const PROCS = [
-    { id: 'PRC-B-DEP', ver: '0.1', kind: '출발', vp: 'VP-B', pts: [[2800, -900, 0], [3800, -1800, 500], [5200, -3500, 1200], [6000, 500, 1500]] },
-    { id: 'PRC-A-ARR', ver: '0.1', kind: '접근', vp: 'VP-A', pts: [[4000, 4200, 1500], [1500, 3000, 1200], [-1000, 1800, 800], [-2000, 1000, 400], [-2500, 600, 0]] },
-    { id: 'PRC-A-DEP', ver: '0.1', kind: '출발', vp: 'VP-A', pts: [[-2500, 600, 0], [-3200, 1500, 500], [-4000, 3200, 1200], [-2000, 5000, 1500]] },
-    { id: 'PRC-B-ARR', ver: '0.1', kind: '접근', vp: 'VP-B', pts: [[-4500, -3500, 1500], [-1500, -2800, 1100], [1200, -1600, 700], [2300, -1100, 300], [2800, -900, 0]] },
-  ].map(p => {
-    const pts = p.pts.map(flip);
-    return { ...p, pts, ll: pts.map(pt => toLL(pt[0], pt[1])), segCount: pts.length - 1 };
-  });
+  const mkProc = p => ({ ...p, ll: p.pts.map(pt => toLL(pt[0], pt[1])), segCount: p.pts.length - 1 });
+  const speedFor = alt => (alt >= 1200 ? 90 : alt >= 700 ? 75 : alt >= 300 ? 55 : 25);
 
   // 순환 경로 구성: 출발 → (이동) → 접근 → 지상 대기 → 출발 ...
-  const speedFor = alt => (alt >= 1200 ? 90 : alt >= 700 ? 75 : alt >= 300 ? 55 : 25);
-  const nodes = [];
-  PROCS.forEach((p, pi) => {
-    const next = PROCS[(pi + 1) % PROCS.length];
-    p.pts.forEach((pt, i) => {
-      const last = i === p.pts.length - 1;
-      if (!last) {
-        nodes.push({ e: pt[0], n: pt[1], alt: pt[2], proc: p, seg: i, dwell: i === 0 && pt[2] === 0 ? 25 : 0 });
-        return;
-      }
-      const nx = next.pts[0];
-      if (nx[0] !== pt[0] || nx[1] !== pt[1]) nodes.push({ e: pt[0], n: pt[1], alt: pt[2], proc: null, seg: -1, dwell: 0 });
+  function buildLoop(procs) {
+    const nodes = [];
+    procs.forEach((p, pi) => {
+      const next = procs[(pi + 1) % procs.length];
+      p.pts.forEach((pt, i) => {
+        const last = i === p.pts.length - 1;
+        if (!last) {
+          nodes.push({ e: pt[0], n: pt[1], alt: pt[2], proc: p, seg: i, dwell: i === 0 && pt[2] === 0 ? 25 : 0 });
+          return;
+        }
+        const nx = next.pts[0];
+        if (nx[0] !== pt[0] || nx[1] !== pt[1]) nodes.push({ e: pt[0], n: pt[1], alt: pt[2], proc: null, seg: -1, dwell: 0 });
+      });
     });
-  });
-  let T = 0;
-  nodes.forEach((nd, i) => {
-    const nx = nodes[(i + 1) % nodes.length];
-    const len = Math.hypot(nx.e - nd.e, nx.n - nd.n);
-    const v0 = speedFor(nd.alt) * KT, v1 = speedFor(nx.alt) * KT;
-    Object.assign(nd, {
-      t0: T, len, v0, v1, nx, dur: len / ((v0 + v1) / 2),
-      ue: (nx.e - nd.e) / len, un: (nx.n - nd.n) / len,
-      hdg: (Math.atan2(nx.e - nd.e, nx.n - nd.n) * 180 / Math.PI + 360) % 360,
+    let T = 0;
+    nodes.forEach((nd, i) => {
+      const nx = nodes[(i + 1) % nodes.length];
+      const len = Math.hypot(nx.e - nd.e, nx.n - nd.n);
+      const v0 = speedFor(nd.alt) * KT, v1 = speedFor(nx.alt) * KT;
+      Object.assign(nd, {
+        t0: T, len, v0, v1, nx, dur: len / ((v0 + v1) / 2),
+        ue: (nx.e - nd.e) / len, un: (nx.n - nd.n) / len,
+        hdg: (Math.atan2(nx.e - nd.e, nx.n - nd.n) * 180 / Math.PI + 360) % 360,
+      });
+      T += nd.dwell + nd.dur;
     });
-    T += nd.dwell + nd.dur;
-  });
-  const PERIOD = T;
+    const period = T;
+    // 버티포트 정차 구간. 지상 대기 구간을 입항(착륙)·출항(이륙)으로 봄.
+    const stops = [];
+    nodes.forEach((nd, i) => {
+      if (!nd.dwell) return;
+      let j = i;
+      do { j = (j - 1 + nodes.length) % nodes.length; } while (!(nodes[j].proc && nodes[j].proc.kind === '접근' && nodes[j].seg === 0));
+      let k = i;
+      do { k = (k + 1) % nodes.length; } while (nodes[k].proc === nd.proc);
+      stops.push({
+        vp: nd.proc.vp, arrProc: nodes[j].proc, depProc: nd.proc,
+        tArr: nd.t0, dwell: nd.dwell,
+        appDur: ((nd.t0 - nodes[j].t0) % period + period) % period,
+        depDur: ((nodes[k].t0 - (nd.t0 + nd.dwell)) % period + period) % period,
+      });
+    });
+    stops.forEach((st, i) => {
+      st.from = stops[(i - 1 + stops.length) % stops.length].vp;
+      st.to = stops[(i + 1) % stops.length].vp;
+    });
+    return { nodes, period, stops };
+  }
 
-  // 버티포트 정차 구간(가상). 순환 경로의 지상 대기 구간을 입항(착륙)·출항(이륙)으로 봄.
-  const STOPS = [];
-  nodes.forEach((nd, i) => {
-    if (!nd.dwell) return;
-    let j = i;
-    do { j = (j - 1 + nodes.length) % nodes.length; } while (!(nodes[j].proc && nodes[j].proc.kind === '접근' && nodes[j].seg === 0));
-    let k = i;
-    do { k = (k + 1) % nodes.length; } while (nodes[k].proc === nd.proc);
-    STOPS.push({
-      vp: nd.proc.vp, arrProc: nodes[j].proc, depProc: nd.proc,
-      tArr: nd.t0, dwell: nd.dwell,
-      appDur: ((nd.t0 - nodes[j].t0) % PERIOD + PERIOD) % PERIOD,
-      depDur: ((nodes[k].t0 - (nd.t0 + nd.dwell)) % PERIOD + PERIOD) % PERIOD,
+  let VERTIPORTS, PROCS, LOOPS;
+  const NET = TMS.LOCATION && TMS.LOCATION.network;
+  if (NET) {
+    // 기준 위치에 정의된 노선망(가상): 중심 버티포트와 주변 섬 버티포트 간 왕복 노선
+    VERTIPORTS = NET.vertiports.map(v => {
+      const e = (v.ll[1] - LON0) * M_LON, n = (v.ll[0] - LAT0) * M_LAT;
+      return { id: v.id, name: v.name, e, n, ll: v.ll.slice() };
     });
-  });
-  STOPS.forEach((s, i) => {
-    s.from = STOPS[(i - 1 + STOPS.length) % STOPS.length].vp;
-    s.to = STOPS[(i + 1) % STOPS.length].vp;
-  });
+    const vp = Object.fromEntries(VERTIPORTS.map(v => [v.id, v]));
+    PROCS = [];
+    // 한 방향 노선: 출발 절차(2구간) + 접근 절차(3구간). 진행 방향 오른쪽으로 250m 띄워 왕복 경로가 겹치지 않게 함.
+    const leg = (a, b) => {
+      const A = vp[a], B = vp[b];
+      const L = Math.hypot(B.e - A.e, B.n - A.n), ux = (B.e - A.e) / L, uy = (B.n - A.n) / L;
+      const at = (d, off) => [A.e + ux * d + uy * off, A.n + uy * d - ux * off];
+      const dep = mkProc({ id: `DEP-${a}-${b}`, ver: '0.1', kind: '출발', vp: a,
+        pts: [[A.e, A.n, 0], [...at(1200, 250), 500], [...at(L * 0.5, 250), 1500]] });
+      const arr = mkProc({ id: `ARR-${a}-${b}`, ver: '0.1', kind: '접근', vp: b,
+        pts: [[...at(L * 0.5, 250), 1500], [...at(L - 2500, 250), 800], [...at(L - 1000, 100), 300], [B.e, B.n, 0]] });
+      PROCS.push(dep, arr);
+      return [dep, arr];
+    };
+    LOOPS = NET.destinations.map(d => buildLoop([...leg(NET.hub, d), ...leg(d, NET.hub)]));
+  } else {
+    // 가상 버티포트 (위치 임의)
+    VERTIPORTS = [
+      { id: 'VP-A', e: -2500, n: 600 },
+      { id: 'VP-B', e: 2800, n: -900 },
+    ].map(v => {
+      const e = v.e + SHIFT[0], n = -v.n + SHIFT[1];
+      return { ...v, e, n, ll: toLL(e, n) };
+    });
+    // 가상 예시 절차. 경로점 [동(m), 북(m), 고도(ft)]. 구간 i = 경로점 i → i+1.
+    PROCS = [
+      { id: 'PRC-B-DEP', ver: '0.1', kind: '출발', vp: 'VP-B', pts: [[2800, -900, 0], [3800, -1800, 500], [5200, -3500, 1200], [6000, 500, 1500]] },
+      { id: 'PRC-A-ARR', ver: '0.1', kind: '접근', vp: 'VP-A', pts: [[4000, 4200, 1500], [1500, 3000, 1200], [-1000, 1800, 800], [-2000, 1000, 400], [-2500, 600, 0]] },
+      { id: 'PRC-A-DEP', ver: '0.1', kind: '출발', vp: 'VP-A', pts: [[-2500, 600, 0], [-3200, 1500, 500], [-4000, 3200, 1200], [-2000, 5000, 1500]] },
+      { id: 'PRC-B-ARR', ver: '0.1', kind: '접근', vp: 'VP-B', pts: [[-4500, -3500, 1500], [-1500, -2800, 1100], [1200, -1600, 700], [2300, -1100, 300], [2800, -900, 0]] },
+    ].map(p => mkProc({ ...p, pts: p.pts.map(flip) }));
+    LOOPS = [buildLoop(PROCS)];
+  }
+  const vpName = id => { const v = VERTIPORTS.find(x => x.id === id); return v && v.name ? v.name : id; };
 
-  function routeAt(tau) {
-    tau = ((tau % PERIOD) + PERIOD) % PERIOD;
+  function routeAt(loop, tau) {
+    const P = loop.period, nodes = loop.nodes;
+    tau = ((tau % P) + P) % P;
     let nd = nodes[nodes.length - 1];
     for (let i = 0; i < nodes.length; i++) {
       if (tau < nodes[i].t0 + nodes[i].dwell + nodes[i].dur) { nd = nodes[i]; break; }
@@ -104,32 +132,53 @@
     };
   }
 
-  // 실증기 1대 + 가상기체 6대 (가상)
-  const AIRCRAFT = ['R01', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06'].map((id, i) => ({
-    id, virtual: id[0] === 'V', type: id[0] === 'V' ? '가상기체' : '실증기(유인)', phase: i * PERIOD / 7,
-  }));
+  // 실증기 1대 + 가상기체 6대 (가상). 노선(순환 경로)에 차례로 배정하고 같은 노선 안에서는 간격을 고르게 둠.
+  const IDS = ['R01', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06'];
+  const perLoop = LOOPS.map(() => []);
+  IDS.forEach((id, i) => perLoop[i % LOOPS.length].push(id));
+  const AIRCRAFT = IDS.map((id, i) => {
+    const li = i % LOOPS.length, loop = LOOPS[li];
+    const k = perLoop[li].indexOf(id);
+    return {
+      id, virtual: id[0] === 'V', type: id[0] === 'V' ? '가상기체' : '실증기(유인)',
+      loop, phase: k * loop.period / perLoop[li].length + li * 97,
+    };
+  });
   const byId = Object.fromEntries(AIRCRAFT.map(a => [a.id, a]));
 
-  // 시연 각본 (가상). SCENARIO_CYCLE_SEC(10분) 주기로 반복. a~b: 주기 내 시각(초)
-  const D = C.SCENARIO_CYCLE_SEC;
-  const SCRIPT = {
-    R01: [{ a: 30, b: 45, kind: 'tlm_loss' }, { a: 360, b: 380, kind: 'adsb_mismatch' }],
-    V01: [{ a: 120, b: 160, kind: 'lateral' }],
-    V02: [{ a: 470, b: 482, kind: 'loss' }],
-    V03: [{ a: 250, b: 264, kind: 'descent' }],
-    V04: [{ a: 540, b: 565, kind: 'speed' }],
-  };
+  // 시연 상황(가상). 기체마다 SCENARIO_SLOT_SEC 단위로 발생 여부·종류·지속 시간·시작 시점을 무작위로 정함.
+  // 시각에 대한 결정적 난수라서 여러 창·여러 사람이 같은 시각에 같은 상황을 봄.
+  // [종류, 비중, 최소 지속(초), 최대 지속(초)]
+  const KINDS = [
+    ['tlm_loss', 3, 15, 25],
+    ['speed', 3, 20, 30],
+    ['lateral', 2, 30, 40],
+    ['adsb_mismatch', 1.5, 15, 25],
+    ['loss', 1, 10, 16],
+    ['descent', 0.5, 14, 14],
+  ];
+  const WSUM = KINDS.reduce((a, k) => a + k[1], 0);
+  const AC_INDEX = Object.fromEntries(IDS.map((id, i) => [id, i]));
+  function rnd(a, b, c) {
+    let h = Math.imul(a, 374761393) ^ Math.imul(b + 1, 668265263) ^ Math.imul(c + 7, 2246822519) ^ 0x9e3779b9;
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
   function activeEvent(id, t) {
-    const list = SCRIPT[id];
-    if (!list) return null;
-    const c = (((t / 1000) % D) + D) % D;
-    for (const ev of list) {
-      if (c >= ev.a && c < ev.b) {
-        const start = Math.round((t - (c - ev.a) * 1000) / C.TICK_MS) * C.TICK_MS;
-        return { ...ev, u: c - ev.a, dur: ev.b - ev.a, start };
-      }
-    }
-    return null;
+    const SLOT = C.SCENARIO_SLOT_SEC;
+    const sec = t / 1000;
+    const slot = Math.floor(sec / SLOT);
+    const ai = AC_INDEX[id];
+    if (rnd(slot, ai, 1) >= C.SCENARIO_EVENT_PROB) return null;
+    let r = rnd(slot, ai, 2) * WSUM;
+    let kind = KINDS[0];
+    for (const k of KINDS) { if ((r -= k[1]) < 0) { kind = k; break; } }
+    const dur = Math.round(kind[2] + rnd(slot, ai, 3) * (kind[3] - kind[2]));
+    const a = Math.floor(rnd(slot, ai, 4) * (SLOT - dur));
+    const u = sec - slot * SLOT - a;
+    if (u < 0 || u >= dur) return null;
+    return { kind: kind[0], u, dur, start: (slot * SLOT + a) * 1000 };
   }
   const inWin = (w, t) => w && t >= w.from && t < w.to;
 
@@ -143,7 +192,7 @@
   }
 
   function kin(ac, t) {
-    const r = routeAt(t / 1000 + ac.phase);
+    const r = routeAt(ac.loop, t / 1000 + ac.phase);
     const ev = activeEvent(ac.id, t);
     const off = ev && ev.kind === 'lateral' ? 320 * Math.sin(Math.PI * ev.u / ev.dur) : 0;
     const e = r.e + r.nd.un * off, n = r.n - r.nd.ue * off;
@@ -315,13 +364,14 @@
   function schedule(vp, t0, t1) {
     const arrivals = [], departures = [];
     AIRCRAFT.forEach((ac, ai) => {
-      STOPS.forEach((st, si) => {
+      const P = ac.loop.period;
+      ac.loop.stops.forEach((st, si) => {
         if (st.vp !== vp) return;
         const base = st.tArr - ac.phase;
-        const m0 = Math.floor((t0 / 1000 - base - PERIOD) / PERIOD);
-        const m1 = Math.ceil((t1 / 1000 - base + PERIOD) / PERIOD);
+        const m0 = Math.floor((t0 / 1000 - base - P) / P);
+        const m1 = Math.ceil((t1 / 1000 - base + P) / P);
         for (let m = m0; m <= m1; m++) {
-          const tArr = (base + m * PERIOD) * 1000;
+          const tArr = (base + m * P) * 1000;
           const tDep = tArr + st.dwell * 1000;
           const key = (ai * 31 + si * 7 + ((m % 97) + 97)) % DELAYS.length;
           const off = DELAYS[key] * 1000;
@@ -341,5 +391,5 @@
     return { arrivals: arrivals.sort(by), departures: departures.sort(by) };
   }
 
-  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, PERIOD, schedule };
+  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName };
 })();
