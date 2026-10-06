@@ -13,7 +13,9 @@
   // 가상 경로는 기준점 남쪽(육지) 위주로 배치함(북쪽 좌표를 뒤집음)
   const toLL = (e, n) => [LAT0 + n / M_LAT, LON0 + e / M_LON];
   const SHIFT = (TMS.LOCATION && TMS.LOCATION.shift) || [0, 0];
-  const flip = pt => [pt[0] + SHIFT[0], -pt[1] + SHIFT[1], pt[2]];
+  // 기본 노선은 7대가 이착륙 간격을 지킬 수 있도록 1.15배로 늘려 배치함
+  const GEN_SCALE = 1.15;
+  const flip = pt => [pt[0] * GEN_SCALE + SHIFT[0], -pt[1] * GEN_SCALE + SHIFT[1], pt[2]];
 
   const VERSIONS = { policy: 'POL-가상-0.3', ruleset: 'RULESET-가상-0.1' };
 
@@ -21,14 +23,15 @@
   const speedFor = alt => (alt >= 1200 ? 90 : alt >= 700 ? 75 : alt >= 300 ? 55 : 25);
 
   // 순환 경로 구성: 출발 → (이동) → 접근 → 지상 대기 → 출발 ...
-  function buildLoop(procs) {
+  // dwellOf(vpId): 해당 버티포트 지상 대기(초). 기본 60초.
+  function buildLoop(procs, dwellOf) {
     const nodes = [];
     procs.forEach((p, pi) => {
       const next = procs[(pi + 1) % procs.length];
       p.pts.forEach((pt, i) => {
         const last = i === p.pts.length - 1;
         if (!last) {
-          nodes.push({ e: pt[0], n: pt[1], alt: pt[2], proc: p, seg: i, dwell: i === 0 && pt[2] === 0 ? 25 : 0 });
+          nodes.push({ e: pt[0], n: pt[1], alt: pt[2], proc: p, seg: i, dwell: i === 0 && pt[2] === 0 ? (dwellOf ? dwellOf(p.vp) : 60) : 0 });
           return;
         }
         const nx = next.pts[0];
@@ -56,11 +59,15 @@
       do { j = (j - 1 + nodes.length) % nodes.length; } while (!(nodes[j].proc && nodes[j].proc.kind === '접근' && nodes[j].seg === 0));
       let k = i;
       do { k = (k + 1) % nodes.length; } while (nodes[k].proc === nd.proc);
+      const fin = nodes[(j + nodes[j].proc.segCount - 1) % nodes.length]; // 최종 접근 구간 시작
+      const up = nodes[(i + 1) % nodes.length];                            // 첫 상승 구간 끝
       stops.push({
         vp: nd.proc.vp, arrProc: nodes[j].proc, depProc: nd.proc,
         tArr: nd.t0, dwell: nd.dwell,
         appDur: ((nd.t0 - nodes[j].t0) % period + period) % period,
         depDur: ((nodes[k].t0 - (nd.t0 + nd.dwell)) % period + period) % period,
+        landDur: ((nd.t0 - fin.t0) % period + period) % period,             // 착륙 움직임 길이
+        toDur: ((up.t0 - (nd.t0 + nd.dwell)) % period + period) % period,   // 이륙 움직임 길이
       });
     });
     stops.forEach((st, i) => {
@@ -92,14 +99,19 @@
       PROCS.push(dep, arr);
       return [dep, arr];
     };
-    LOOPS = NET.destinations.map(d => buildLoop([...leg(NET.hub, d), ...leg(d, NET.hub)]));
+    // 운항 주기를 모든 노선에 같게 맞춤(중심 지상 대기 고정, 남는 시간은 섬 지상 대기)
+    const legs = NET.destinations.map(d => [...leg(NET.hub, d), ...leg(d, NET.hub)]);
+    const hubDwell = C.HUB_TURNAROUND_SEC, islandMin = C.ISLAND_MIN_TURNAROUND_SEC;
+    const base = legs.map(procs => buildLoop(procs, v => (v === NET.hub ? hubDwell : islandMin)).period);
+    const cycle = Math.max(C.NETWORK_CYCLE_SEC, Math.ceil(Math.max(...base) / 60) * 60 + 120);
+    LOOPS = legs.map((procs, i) => buildLoop(procs, v => (v === NET.hub ? hubDwell : islandMin + (cycle - base[i]))));
   } else {
     // 가상 버티포트 (위치 임의)
     VERTIPORTS = [
       { id: 'VP-A', e: -2500, n: 600 },
       { id: 'VP-B', e: 2800, n: -900 },
     ].map(v => {
-      const e = v.e + SHIFT[0], n = -v.n + SHIFT[1];
+      const e = v.e * GEN_SCALE + SHIFT[0], n = -v.n * GEN_SCALE + SHIFT[1];
       return { ...v, e, n, ll: toLL(e, n) };
     });
     // 가상 예시 절차. 경로점 [동(m), 북(m), 고도(ft)]. 구간 i = 경로점 i → i+1.
@@ -109,7 +121,7 @@
       { id: 'PRC-A-DEP', ver: '0.1', kind: '출발', vp: 'VP-A', pts: [[-2500, 600, 0], [-3200, 1500, 500], [-4000, 3200, 1200], [-2000, 5000, 1500]] },
       { id: 'PRC-B-ARR', ver: '0.1', kind: '접근', vp: 'VP-B', pts: [[-4500, -3500, 1500], [-1500, -2800, 1100], [1200, -1600, 700], [2300, -1100, 300], [2800, -900, 0]] },
     ].map(p => mkProc({ ...p, pts: p.pts.map(flip) }));
-    LOOPS = [buildLoop(PROCS)];
+    LOOPS = [buildLoop(PROCS, () => 25)];
   }
   const vpName = id => { const v = VERTIPORTS.find(x => x.id === id); return v && v.name ? v.name : id; };
 
@@ -136,13 +148,39 @@
   const IDS = ['R01', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06'];
   const perLoop = LOOPS.map(() => []);
   IDS.forEach((id, i) => perLoop[i % LOOPS.length].push(id));
+  // 출발 시각(위상) 배정: 버티포트마다 착륙·이륙 움직임이 겹치지 않도록(간격 PAD_SEPARATION_SEC) 차례로 고름.
+  // 모든 노선의 주기가 같으므로 한 주기 안에서 겹치지 않으면 계속 겹치지 않음.
+  const occupied = {}; // vp → [[시작, 끝], ...] (주기 내 시각)
+  const SEP = C.PAD_SEPARATION_SEC;
+  const movesOf = (loop, phase) => {
+    const P = loop.period, m = x => ((x % P) + P) % P;
+    return loop.stops.flatMap(st => [
+      { vp: st.vp, s: m(st.tArr - st.landDur - phase), d: st.landDur, ac: loop },
+      { vp: st.vp, s: m(st.tArr + st.dwell - phase), d: st.toDur, ac: loop },
+    ]);
+  };
+  const clash = (a, b, P) => {
+    // 원형 시간축(길이 P)에서 두 구간이 겹치지 않으면 앞뒤 빈틈의 합 + 두 길이 = P. 빈틈이 SEP보다 작으면 충돌.
+    const gap1 = ((b.s - (a.s + a.d)) % P + P) % P;
+    const gap2 = ((a.s - (b.s + b.d)) % P + P) % P;
+    const disjoint = Math.abs(gap1 + gap2 + a.d + b.d - P) < 1e-6;
+    return !disjoint || gap1 < SEP || gap2 < SEP;
+  };
+  const fits = (moves, P) => moves.every(mv => (occupied[mv.vp] || []).every(o => !clash(mv, o, P)));
+  // 기준 순서: 중심 버티포트(노선망) 또는 첫 정차지의 착륙 시작을 주기를 기체 수로 나눈 시각에 맞추고,
+  // 다른 버티포트에서 겹치면 앞뒤로 5초씩 옮겨 가며 찾음.
+  const hubId = NET ? NET.hub : LOOPS[0].stops[0].vp;
   const AIRCRAFT = IDS.map((id, i) => {
-    const li = i % LOOPS.length, loop = LOOPS[li];
-    const k = perLoop[li].indexOf(id);
-    return {
-      id, virtual: id[0] === 'V', type: id[0] === 'V' ? '가상기체' : '실증기(유인)',
-      loop, phase: k * loop.period / perLoop[li].length + li * 97,
-    };
+    const li = i % LOOPS.length, loop = LOOPS[li], P = loop.period;
+    const hs = loop.stops.find(st => st.vp === hubId) || loop.stops[0];
+    const ideal = (hs.tArr - hs.landDur) - i * P / IDS.length;
+    let phase = ideal;
+    for (let k = 0; k < P / 5; k++) {
+      const cand = ideal + (k % 2 ? -1 : 1) * Math.ceil(k / 2) * 5;
+      if (fits(movesOf(loop, cand), P)) { phase = cand; break; }
+    }
+    movesOf(loop, phase).forEach(mv => (occupied[mv.vp] = occupied[mv.vp] || []).push({ ...mv, ac: id }));
+    return { id, virtual: id[0] === 'V', type: id[0] === 'V' ? '가상기체' : '실증기(유인)', loop, phase };
   });
   const byId = Object.fromEntries(AIRCRAFT.map(a => [a.id, a]));
 
@@ -391,5 +429,19 @@
     return { arrivals: arrivals.sort(by), departures: departures.sort(by) };
   }
 
-  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName };
+  // 검증용: 버티포트별 이착륙 움직임 목록(주기 내 시각)과 최소 간격
+  function padCheck() {
+    const out = {};
+    Object.entries(occupied).forEach(([vp, list]) => {
+      const P = AIRCRAFT[0].loop.period;
+      const xs = list.slice().sort((a, b) => a.s - b.s);
+      let minGap = Infinity;
+      // 서로 다른 기체 사이의 간격만 봄(같은 기체의 착륙→이륙은 동시에 일어날 수 없음)
+      xs.forEach((a, i) => { const b = xs[(i + 1) % xs.length]; if (a.ac === b.ac) return; const g = ((b.s - (a.s + a.d)) % P + P) % P; minGap = Math.min(minGap, g); });
+      out[vp] = { moves: xs.length, minGapSec: Math.round(minGap) };
+    });
+    return out;
+  }
+
+  TMS.mock = { AIRCRAFT, PROCS, VERTIPORTS, VERSIONS, ITEM_DEFS, sample, events, track, verify, toLL, schedule, vpName, padCheck };
 })();

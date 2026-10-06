@@ -15,6 +15,12 @@ TMS.config = {
   // 시연 상황 무작위 발생: 기체마다 SLOT초 단위로 PROB 확률로 이상 상황 1건(확인 필요 경보 시간당 15건 안팎)
   SCENARIO_SLOT_SEC: 60,
   SCENARIO_EVENT_PROB: 0.07,
+  // 버티포트 이착륙 분리: 같은 버티포트에서 착륙·이륙은 한 번에 한 대만 하며, 앞뒤 움직임 사이에 이 간격(초)을 둠
+  PAD_SEPARATION_SEC: 30,
+  // 노선망 운항 주기(초)와 중심 버티포트 지상 대기(초). 남는 시간은 섬 지상 대기로 씀.
+  NETWORK_CYCLE_SEC: 1800,
+  HUB_TURNAROUND_SEC: 90,
+  ISLAND_MIN_TURNAROUND_SEC: 120,
   // 지도 기준 위치(아래 TMS.LOCATION에서 정함). 가상 절차·버티포트는 이 점을 기준으로 한 상대 좌표(임의값)임.
   MAP_CENTER: null,
   MAP_ZOOM: 13,
