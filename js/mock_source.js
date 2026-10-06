@@ -127,31 +127,32 @@
     // ---- 중심 버티포트 시계비행 국지절차(가상) ----
     const V = NET.vfr;
     const H0 = [hubV.e, hubV.n];
-    const rel = p => [H0[0] + p[0], H0[1] + p[1]];
-    VFR_POINTS = Object.entries(V.points).map(([id, p]) => { const q = rel(p); return { id, e: q[0], n: q[1], ll: toLL(q[0], q[1]) }; });
+    const polar = (bearing, dist) => { const b = bearing * Math.PI / 180; return [H0[0] + Math.sin(b) * dist, H0[1] + Math.cos(b) * dist]; };
+    VFR_POINTS = Object.entries(V.points).map(([id, p]) => { const q = polar(p.bearing, p.dist); return { id, clock: p.clock, e: q[0], n: q[1], ll: toLL(q[0], q[1]) }; });
     const pt = id => VFR_POINTS.find(x => x.id === id);
     const unit = (a, b) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
-    // 출항 절차: 버티포트 → 상승 지점(1km, 500ft) → 출항 보고점(1500ft)
+    // 출항 절차: 버티포트 → 상승 지점(1km, 500ft) → 보고점(출항 고도)
     const depProcs = {};
     Object.entries(V.departures).forEach(([id, vrp]) => {
       const P = pt(vrp), u = unit(H0, [P.e, P.n]);
       depProcs[id] = mkProc({ id, ver: '0.1', kind: '출발', vp: NET.hub, gate: vrp,
-        pts: [[H0[0], H0[1], 0], [H0[0] + u[0] * V.gateDist, H0[1] + u[1] * V.gateDist, 500], [P.e, P.n, 1500]] });
+        pts: [[H0[0], H0[1], 0], [H0[0] + u[0] * V.gateDist, H0[1] + u[1] * V.gateDist, 500], [P.e, P.n, V.depAlt]] });
       PROCS.push(depProcs[id]);
     });
-    // 입항 절차: 대기점 → 입항 보고점(800ft) → 최종 접근점(1km, 300ft) → 착륙. 대기점 고도는 노선별로 다름(같은 대기점에서 층 분리).
-    const arrDefs = {};
-    HOLDS = [];
-    Object.entries(V.arrivals).forEach(([id, a]) => {
-      const P = pt(a.vrp), Hq = rel(a.hold.at);
-      const u = unit(Hq, H0); // 대기점 → 버티포트 방향(대기 경로 안쪽 방향)
-      const hold = { id: a.hold.id, arr: id, turn: a.hold.turn === 'L' ? -1 : 1, e: Hq[0], n: Hq[1], ux: u[0], uy: u[1], ll: toLL(Hq[0], Hq[1]), alts: [] };
+    // 공중대기점: 대기 경로 안쪽 방향은 버티포트 쪽, 경로는 바깥쪽으로 뻗음
+    HOLDS = Object.entries(V.holds).map(([id, h]) => {
+      const q = polar(h.bearing, h.dist), u = unit(q, H0);
+      const hold = { id, turn: h.turn === 'L' ? -1 : 1, e: q[0], n: q[1], ux: u[0], uy: u[1], ll: toLL(q[0], q[1]), alts: [] };
       const pat = [];
-      for (let s2 = 0; s2 <= HOLD_LAP_M; s2 += 100) { const q = holdPos(hold, s2); pat.push(toLL(q.e, q.n)); }
+      for (let s2 = 0; s2 <= HOLD_LAP_M; s2 += 100) { const r2 = holdPos(hold, s2); pat.push(toLL(r2.e, r2.n)); }
       hold.pattern = pat;
-      HOLDS.push(hold);
-      const g = unit([P.e, P.n], H0);
-      arrDefs[id] = { hold, vrp: P, final: [H0[0] - g[0] * V.gateDist, H0[1] - g[1] * V.gateDist] };
+      return hold;
+    });
+    // 입항 절차: 대기점 → 보고점(입항 고도) → 최종 접근점(1km, 300ft) → 착륙
+    const arrDefs = {};
+    Object.entries(V.arrivals).forEach(([id, a]) => {
+      const P = pt(a.vrp), g = unit([P.e, P.n], H0);
+      arrDefs[id] = { hold: HOLDS.find(h => h.id === a.hold), vrp: P, final: [H0[0] - g[0] * V.gateDist, H0[1] - g[1] * V.gateDist] };
     });
     const arrCache = {};
     const hubArr = (id, alt) => {
@@ -160,7 +161,7 @@
       const d = arrDefs[id];
       if (!d.hold.alts.includes(alt)) d.hold.alts.push(alt);
       const p = mkProc({ id, ver: '0.1', kind: '접근', vp: NET.hub, hold: d.hold.id, gate: d.vrp.id,
-        pts: [[d.hold.e, d.hold.n, alt], [d.vrp.e, d.vrp.n, 800], [d.final[0], d.final[1], 300], [H0[0], H0[1], 0]] });
+        pts: [[d.hold.e, d.hold.n, alt], [d.vrp.e, d.vrp.n, V.arrAlt], [d.final[0], d.final[1], 300], [H0[0], H0[1], 0]] });
       if (!Object.keys(arrCache).some(x => x.startsWith(`${id}@`))) PROCS.push(p); // 지도에는 절차당 한 번만 그림
       arrCache[k] = p;
       return p;
@@ -334,7 +335,7 @@
     const laps = h ? holdLaps(ac, m) : 0;
     if (laps) {
       const H = laps * HOLD_LAP_SEC;
-      if (x >= h.tauD - H && x < h.tauF - H) return routeAt(ac.loop, x + H);
+      if (x >= h.tauD - H && x < h.tauF - H) return { ...routeAt(ac.loop, x + H), holdEdge: (h.tauF - H) - x };
       if (x >= h.tauF - H && x < h.tauF) {
         const el = x - (h.tauF - H);
         const q = holdPos(h.ref, el * HOLD_V);
@@ -345,7 +346,9 @@
         };
       }
     }
-    return routeAt(ac.loop, x);
+    const r0 = routeAt(ac.loop, x);
+    if (laps && x >= h.tauF) r0.holdEdge = x - h.tauF;
+    return r0;
   }
 
   // 시연 상황(가상). 기체마다 SCENARIO_SLOT_SEC 단위로 발생 여부·종류·지속 시간·시작 시점을 무작위로 정함.
@@ -398,7 +401,9 @@
     const ev = activeEvent(ac.id, t);
     // 경로 이탈 폭은 저고도(700ft 미만)에서 줄어 착륙·지상에서는 0이 됨
     const lowFade = Math.max(0, Math.min(1, (r.alt - 700) / 400));
-    const off = ev && ev.kind === 'lateral' ? 320 * Math.sin(Math.PI * ev.u / ev.dur) * lowFade : 0;
+    // 공중대기 중에는 경로 이탈 없음. 대기 진입 전·후 20초 동안 이탈 폭을 서서히 줄이고 늘림
+    const holdFade = r.holdEdge == null ? 1 : Math.max(0, Math.min(1, r.holdEdge / 20));
+    const off = ev && ev.kind === 'lateral' && !r.holding ? 320 * Math.sin(Math.PI * ev.u / ev.dur) * lowFade * holdFade : 0;
     const e = r.e + r.nd.un * off, n = r.n - r.nd.ue * off;
     const vs = ev && ev.kind === 'descent' && !r.ground ? -1500 : r.vs;
     const gs = ev && ev.kind === 'speed' && !r.ground ? r.gs + 30 : r.gs;

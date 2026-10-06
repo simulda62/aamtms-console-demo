@@ -68,7 +68,10 @@
   function init(el) {
     map = L.map(el, { zoomControl: false, attributionControl: true, minZoom: 9, zoomSnap: 0.25 }).setView(C.MAP_CENTER, C.MAP_ZOOM);
     // 넓게 볼 때는 절차 이름을 숨겨 겹침을 줄임
-    const syncZoomClass = () => map.getContainer().classList.toggle('zoom-far', map.getZoom() < 12.5);
+    const syncZoomClass = () => {
+      map.getContainer().classList.toggle('zoom-far', map.getZoom() < 12.5);
+      map.getContainer().classList.toggle('zoom-mid', map.getZoom() < 14);
+    };
     map.on('zoomend', syncZoomClass);
     L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
     map.attributionControl.setPrefix('Leaflet');
@@ -94,7 +97,9 @@
         if (d > best) { best = d; li = i; }
       }
       const mid = [(p.ll[li][0] + p.ll[li + 1][0]) / 2, (p.ll[li][1] + p.ll[li + 1][1]) / 2];
-      L.marker(mid, { interactive: false, icon: L.divIcon({ className: 'proc-label', html: `${p.id} <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);
+      // 국지절차(중심 버티포트 출입항) 이름은 더 확대했을 때만 표시
+      const local = !!p.gate;
+      L.marker(mid, { interactive: false, icon: L.divIcon({ className: `proc-label${local ? ' proc-label--local' : ''}`, html: `${p.id} <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);
     });
     // 공중대기 공역(가상): 대기 경로와 기점
     (M.HOLDS || []).forEach(h => {
@@ -104,7 +109,7 @@
     });
     // 시계비행 보고점(가상): 삼각형 표식
     (M.VFR_POINTS || []).forEach(p => {
-      L.marker(p.ll, { interactive: false, icon: L.divIcon({ className: 'vrp', html: `<span class="vrp__mk"></span><span class="vrp__txt">${p.id}</span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(procLayer);
+      L.marker(p.ll, { interactive: false, icon: L.divIcon({ className: 'vrp', html: `<span class="vrp__mk"></span><span class="vrp__txt">${p.id}${p.clock ? ` · ${p.clock}시` : ''}</span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(procLayer);
     });
     (M.HOLD_AREAS || []).forEach(a => {
       L.marker(a.ll, { interactive: false, icon: L.divIcon({ className: 'hold-label', html: `${a.id} 공중대기 <i>가상</i>`, iconSize: [0, 0] }) }).addTo(procLayer);

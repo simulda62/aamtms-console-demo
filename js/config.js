@@ -60,23 +60,37 @@ TMS.LOCATION_PRESETS = {
         { id: 'YHD', name: '영흥도', ll: [37.25607, 126.45903] },
       ],
       destinations: ['DIJ', 'SIJ', 'SBD', 'DJD', 'YHD'],
-      // 자월도 시험장 시계비행(VFR) 국지절차(가상 예시). 좌표는 중심 버티포트 기준 [동, 북](m).
-      // 출항은 북·남 보고점, 입항은 서·동 보고점으로 나누어 출입항 흐름이 마주치지 않게 함. 공중대기는 입항 보고점 바깥 서·동 대기점.
+      // 자월도 시험장 시계비행(VFR) 국지절차(가상 예시). 위치는 중심 버티포트 기준 방위(도)·거리(m).
+      // 보고점은 시계 방향 10시·2시·4시·8시. 각 섬은 방향이 가까운 보고점으로 출입항하며,
+      // 출항은 보고점을 1,200ft, 입항은 800ft로 지나 고도로 분리함. 공중대기점은 서·동 두 곳.
       vfr: {
-        points: { 'VRP-N': [0, 3000], 'VRP-S': [0, -3000], 'VRP-W': [-3000, 0], 'VRP-E': [4000, 0] },
-        gateDist: 1000, // 이륙 후 상승 지점·최종 접근점: 버티포트에서 1km
-        departures: { 'DEP-JAW-N': 'VRP-N', 'DEP-JAW-S': 'VRP-S' },
-        arrivals: {
-          'ARR-JAW-W': { vrp: 'VRP-W', hold: { id: 'HOLD-W', at: [-5000, 0], turn: 'R' } },
-          'ARR-JAW-E': { vrp: 'VRP-E', hold: { id: 'HOLD-E', at: [6000, 0], turn: 'R' } },
+        points: {
+          'VRP-NW': { bearing: 300, dist: 2000, clock: 10 },
+          'VRP-NE': { bearing: 60, dist: 2000, clock: 2 },
+          'VRP-SE': { bearing: 120, dist: 2000, clock: 4 },
+          'VRP-SW': { bearing: 240, dist: 2000, clock: 8 },
         },
-        // 노선별 출항 절차·입항 절차·공중대기 고도(ft)
+        holds: {
+          'HOLD-W': { bearing: 270, dist: 3000, turn: 'R' },
+          'HOLD-E': { bearing: 90, dist: 3000, turn: 'R' },
+        },
+        gateDist: 1000, // 이륙 후 상승 지점·최종 접근점: 버티포트에서 1km
+        depAlt: 1200,   // 출항 보고점 통과 고도(ft)
+        arrAlt: 800,    // 입항 보고점 통과 고도(ft)
+        departures: { 'DEP-JAW-NW': 'VRP-NW', 'DEP-JAW-NE': 'VRP-NE', 'DEP-JAW-SE': 'VRP-SE', 'DEP-JAW-SW': 'VRP-SW' },
+        arrivals: {
+          'ARR-JAW-NW': { vrp: 'VRP-NW', hold: 'HOLD-W' },
+          'ARR-JAW-SW': { vrp: 'VRP-SW', hold: 'HOLD-W' },
+          'ARR-JAW-NE': { vrp: 'VRP-NE', hold: 'HOLD-E' },
+          'ARR-JAW-SE': { vrp: 'VRP-SE', hold: 'HOLD-E' },
+        },
+        // 노선별 출항 절차·입항 절차·공중대기 고도(ft). 같은 대기점은 고도로 층을 나눔.
         routes: {
-          DIJ: { dep: 'DEP-JAW-S', arr: 'ARR-JAW-W', holdAlt: 1500 },
-          SIJ: { dep: 'DEP-JAW-S', arr: 'ARR-JAW-W', holdAlt: 1200 },
-          DJD: { dep: 'DEP-JAW-N', arr: 'ARR-JAW-W', holdAlt: 900 },
-          SBD: { dep: 'DEP-JAW-S', arr: 'ARR-JAW-E', holdAlt: 900 },
-          YHD: { dep: 'DEP-JAW-N', arr: 'ARR-JAW-E', holdAlt: 1200 },
+          DJD: { dep: 'DEP-JAW-NW', arr: 'ARR-JAW-NW', holdAlt: 900 },
+          SIJ: { dep: 'DEP-JAW-SW', arr: 'ARR-JAW-SW', holdAlt: 1200 },
+          DIJ: { dep: 'DEP-JAW-SW', arr: 'ARR-JAW-SW', holdAlt: 1500 },
+          SBD: { dep: 'DEP-JAW-SE', arr: 'ARR-JAW-SE', holdAlt: 900 },
+          YHD: { dep: 'DEP-JAW-NE', arr: 'ARR-JAW-NE', holdAlt: 1200 },
         },
       },
     },
