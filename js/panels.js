@@ -460,7 +460,7 @@
       + card('병행 운용 기록', [['기록', `${ops.length}건`], ['일치 / 불일치', `${agree} / ${ops.length - agree}`]], '<p class="hint">일치율 평가는 기록 서비스에서 수행함.</p>');
   }
 
-  // ---------- 버티포트 운항 일정 ----------
+  // ---------- 버티포트 운항일정 ----------
   let schedVp = M.VERTIPORTS[0].id;
   let schedAt = 0;
   let schedSel;
@@ -604,7 +604,7 @@
     if (visible('pane-detail')) updateDetail();
     if (visible('pane-events')) updateEvents();
     if (visible('pane-system')) updateSystem();
-    if (S.view === 'schedule') updateSchedule();
+    if (S.view === 'flightplan') updateSchedule();
     if (visible('pane-map')) { updateAlerts(); updateGauges(); }
   }
 

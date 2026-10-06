@@ -74,14 +74,14 @@ TMS.VIEWS = {
   map:           { label: '상황 지도', tab: true },
   detail:        { label: '기체·판정', tab: true },
   events:        { label: '경보·시스템', tab: true },
-  schedule:      { label: '운항 일정', tab: true },
+  flightplan:    { label: '운항일정', tab: true },
   detail_events: { label: '기체·판정·경보', tab: false },
 };
 
 TMS.LAYOUT_PRESETS = {
   2: ['map', 'detail_events'],
   3: ['map', 'detail', 'events'],
-  4: ['map', 'detail', 'events', 'schedule'],
+  4: ['map', 'detail', 'events', 'flightplan'],
 };
 
 // 공통 형식 함수

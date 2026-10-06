@@ -7,7 +7,9 @@
 (function () {
   const C = TMS.config, M = TMS.mock;
   const params = new URLSearchParams(location.search);
-  const view = TMS.VIEWS[params.get('view')] ? params.get('view') : 'main';
+  const VIEW_ALIAS = { schedule: 'flightplan' }; // 예전 주소 호환
+  const reqView = VIEW_ALIAS[params.get('view')] || params.get('view');
+  const view = TMS.VIEWS[reqView] ? reqView : 'main';
   const HISTORY_MS = 15 * 60 * 1000;
   const FAR = Number.MAX_SAFE_INTEGER;
 

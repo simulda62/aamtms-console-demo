@@ -188,13 +188,13 @@ body[data-view="detail_events"] .layout {
   grid-template-areas: "list detail" "list events";
 }
 body[data-view="detail_events"] .pane-map, body[data-view="detail_events"] .pane-system { display: none; }
-/* 운항 일정 */
+/* 운항일정 */
 .pane-sched-head, .pane-arr, .pane-dep { display: none; }
 .pane-sched-head { grid-area: shead; } .pane-arr { grid-area: arr; } .pane-dep { grid-area: dep; }
-body[data-view="schedule"] .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "shead shead" "arr dep"; }
-body[data-view="schedule"] .pane:not(.pane-sched-head):not(.pane-arr):not(.pane-dep) { display: none; }
-body[data-view="schedule"] .pane-sched-head, body[data-view="schedule"] .pane-arr, body[data-view="schedule"] .pane-dep { display: flex; }
-body.assets-closed[data-view="schedule"] .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "shead shead" "arr dep"; }
+body[data-view="flightplan"] .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "shead shead" "arr dep"; }
+body[data-view="flightplan"] .pane:not(.pane-sched-head):not(.pane-arr):not(.pane-dep) { display: none; }
+body[data-view="flightplan"] .pane-sched-head, body[data-view="flightplan"] .pane-arr, body[data-view="flightplan"] .pane-dep { display: flex; }
+body.assets-closed[data-view="flightplan"] .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "shead shead" "arr dep"; }
 
 /* 기체 목록 닫기 */
 body.assets-closed .pane-list { display: none; }
@@ -518,7 +518,7 @@ body[data-view="detail"] .d-foot, body[data-view="detail_events"] .d-foot, body[
 .arrow { color: var(--muted); margin: 0 6px; }
 .system-body { flex: 1; overflow-y: auto; }
 
-/* ---------- 버티포트 운항 일정 ---------- */
+/* ---------- 버티포트 운항일정 ---------- */
 .sched-head { display: flex; align-items: center; gap: 24px; padding: 14px 16px; flex-wrap: wrap; }
 .sched-title h2 { margin: 4px 0 0; font-size: 20px; font-weight: 600; }
 .sched-title .eyebrow { color: var(--caution); }
