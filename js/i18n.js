@@ -242,6 +242,7 @@
     '응답': '',
     '이상': 'Fault',
     '일반': 'Street',
+    '오른쪽 배경·표시 버튼으로 다시 열 수 있음': 'Reopen it with the Basemap & layers button on the right',
     '위도·경도를 확인할 것': 'Check latitude and longitude',
     '지도 중심으로': 'Use map center',
     '정석비행장': 'Jeongseok Airfield',

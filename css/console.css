@@ -332,6 +332,7 @@ body[data-view="detail"] .asset, body[data-view="detail_events"] .asset { grid-t
 .loc-msg { margin: 6px 0 0; font-size: 11.5px; color: var(--warning); }
 .layer-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-2); }
 .layer-foot .btn--block { margin-top: 0; }
+.layer-hint { margin: 6px 0 0; font-size: 11px; color: var(--muted); line-height: 1.4; }
 .ctl-btn.is-hint { color: var(--accent); box-shadow: 0 0 0 2px var(--accent); animation: hint 0.8s ease-in-out 3; }
 @keyframes hint { 50% { box-shadow: 0 0 0 5px rgba(45, 212, 191, .35); } }
 
