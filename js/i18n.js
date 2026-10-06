@@ -75,7 +75,7 @@
     '판정 결과 수신 중단': 'Stop verdict feed',
     '판정 기록 버전·서명': 'VERSIONS & SIGNATURE',
     '중단접근·전환 수행': 'Go-around / transition',
-    '각본 (240초 주기, 현재': 'Script (240 s cycle, now',
+    '각본 (600초 주기, 현재': 'Script (600 s cycle, now',
     '연동된 화면 창 수': 'Linked windows',
     '서명 검증 실패 10초': 'Signature fail 10 s',
     '관제 요원(시안)': 'Operator (demo)',

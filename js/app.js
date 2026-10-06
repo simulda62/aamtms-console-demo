@@ -107,7 +107,8 @@
       $('#demo-feed').checked = !!S.overrides.feedDown;
       const live = S.mode === 'live';
       ['#demo-feed', '#demo-loss', '#demo-sig'].forEach(s => { $(s).disabled = !live; });
-      $('#demo-cycle').textContent = `${Math.floor(((S.now / 1000) % 240 + 240) % 240)}초`;
+      const cyc = C.SCENARIO_CYCLE_SEC;
+      $('#demo-cycle').textContent = `${Math.floor(((S.now / 1000) % cyc + cyc) % cyc)}초`;
       if (S.selected && document.activeElement !== sel && sel.dataset.last !== S.selected) { sel.value = S.selected; sel.dataset.last = S.selected; }
     });
   }

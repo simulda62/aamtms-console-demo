@@ -110,14 +110,14 @@
   }));
   const byId = Object.fromEntries(AIRCRAFT.map(a => [a.id, a]));
 
-  // 시연 각본 (가상). 240초 주기로 반복. a~b: 주기 내 시각(초)
-  const D = 240;
+  // 시연 각본 (가상). SCENARIO_CYCLE_SEC(10분) 주기로 반복. a~b: 주기 내 시각(초)
+  const D = C.SCENARIO_CYCLE_SEC;
   const SCRIPT = {
-    R01: [{ a: 20, b: 35, kind: 'tlm_loss' }, { a: 130, b: 150, kind: 'adsb_mismatch' }],
-    V01: [{ a: 60, b: 100, kind: 'lateral' }],
-    V02: [{ a: 170, b: 182, kind: 'loss' }],
-    V03: [{ a: 100, b: 118, kind: 'descent' }],
-    V04: [{ a: 200, b: 225, kind: 'speed' }],
+    R01: [{ a: 30, b: 45, kind: 'tlm_loss' }, { a: 360, b: 380, kind: 'adsb_mismatch' }],
+    V01: [{ a: 120, b: 160, kind: 'lateral' }],
+    V02: [{ a: 470, b: 482, kind: 'loss' }],
+    V03: [{ a: 250, b: 264, kind: 'descent' }],
+    V04: [{ a: 540, b: 565, kind: 'speed' }],
   };
   function activeEvent(id, t) {
     const list = SCRIPT[id];
@@ -180,7 +180,7 @@
     set('altitude', 'normal', `${altDev >= 0 ? '+' : ''}${altDev.toFixed(0)} ft`);
     set('speed', ev && ev.kind === 'speed' && !k.ground ? 'caution' : 'normal', `${k.gs.toFixed(0)} kt`);
     let ds = 'normal';
-    if (ev && ev.kind === 'descent' && !k.ground) ds = ev.u < 4 || ev.u >= 14 ? 'warning' : 'emergency';
+    if (ev && ev.kind === 'descent' && !k.ground) ds = ev.u < 4 ? 'warning' : 'emergency';
     set('descent', ds, `${k.vs.toFixed(0)} fpm`);
     set('separation', 'normal', nearestM == null ? '—' : `${(nearestM / 1000).toFixed(2)} km`);
     let ls = 'normal', lv = '두 경로 정상';

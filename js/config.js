@@ -12,6 +12,8 @@ TMS.config = {
   TRAIL_SEC: 60,
   // 재생 가능 범위(초). 시안에서는 최근 30분.
   REPLAY_WINDOW_SEC: 1800,
+  // 시안 각본 반복 주기(초). 경보가 지나치게 잦지 않도록 10분으로 둠.
+  SCENARIO_CYCLE_SEC: 600,
   // 지도 기준 위치(아래 TMS.LOCATION에서 정함). 가상 절차·버티포트는 이 점을 기준으로 한 상대 좌표(임의값)임.
   MAP_CENTER: null,
   MAP_ZOOM: 13,
