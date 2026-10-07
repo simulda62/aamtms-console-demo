@@ -163,6 +163,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .chip--warn b { color: var(--warning); }
 .chip--bad b { color: var(--emergency); }
 .chip--nodata b { color: var(--nodata); }
+/* 시안 전용 일괄 소거 단추(장시간 시연용): 상태줄 오른쪽 구석에 작게 둠 */
+.btn--bulk { margin-left: auto; font-size: 11px; padding: 1px 8px; color: var(--muted); background: transparent; border: 1px dashed var(--line-2); }
+.btn--bulk b { color: var(--warning); font-weight: 600; margin: 0 2px; }
+.btn--bulk em { font-style: normal; font-size: 10px; margin-left: 4px; padding: 0 4px; border: 1px solid var(--line-2); border-radius: 2px; }
+.btn--bulk:hover { color: var(--text); border-color: var(--muted); }
+.btn--bulk:not([hidden]) + .clock { margin-left: 12px; }
 .clock { margin-left: auto; font-size: 11px; color: var(--muted); letter-spacing: .04em; }
 .clock b { color: var(--text); font-size: 12.5px; font-weight: 500; margin-left: 10px; }
 

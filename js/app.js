@@ -100,6 +100,15 @@
     const sel = $('#demo-ac');
     sel.innerHTML = M.AIRCRAFT.map(a => `<option value="${a.id}">${a.id}${a.virtual ? ' (가상)' : ''}</option>`).join('');
     $('#demo-feed').addEventListener('change', e => S.setFeedDown(e.target.checked));
+    // 시안 전용 일괄 소거(상태줄 구석 단추와 시안 제어). 묻고 나서 모든 연동 창에 적용함
+    const ackAll = () => {
+      const n = S.unacked().length;
+      if (!n) { TMS.panels.toast('미확인 경보 없음'); return; }
+      if (!confirm(TMS.i18n.t(`미확인 경보 ${n}건을 모두 확인 처리함(시안 전용 일괄 소거). 계속할까요?`))) return;
+      TMS.panels.toast(`일괄 소거 완료: 미확인 경보 ${S.ackAll()}건`);
+    };
+    $('#btn-ack-all').addEventListener('click', ackAll);
+    $('#demo-ack-all').addEventListener('click', ackAll);
     $('#demo-loss').addEventListener('click', () => { S.simLoss(sel.value); TMS.panels.toast(`${sel.value} 수신 두절 10초 모사`); });
     $('#demo-sig').addEventListener('click', () => { S.simSigFail(sel.value); TMS.panels.toast(`${sel.value} 서명 검증 실패 10초 모사`); });
     S.on(() => {

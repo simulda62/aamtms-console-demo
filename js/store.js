@@ -147,6 +147,18 @@
     if (!fromPeer) send({ type: 'ack', evId, ack: S.acks[evId] });
     emit();
   };
+  // 시안 전용 일괄 소거: 미확인 경보를 한꺼번에 확인 처리함(장시간 시연용). 운영 제품에는 두지 않음(설계서: 경보 일괄 확인 없음)
+  S.ackAll = function (ids, fromPeer, ack) {
+    ids = ids || S.unacked().map(ev => ev.id);
+    ack = ack || { t: Date.now(), by: C.OPERATOR, win: S.view, bulk: true };
+    let n = 0;
+    ids.forEach(id => { if (!S.acks[id]) { S.acks[id] = ack; n++; } });
+    if (!n) return 0;
+    S.evVersion++;
+    if (!fromPeer) send({ type: 'ackAll', ids, ack });
+    emit();
+    return n;
+  };
   S.addOp = function (rec, fromPeer) {
     if (S.opRecords.some(r => r.id === rec.id)) return;
     S.opRecords.push(rec);
@@ -225,6 +237,7 @@
       case 'bye': delete S.peers[m.from]; break;
       case 'select': S.select(m.id, true); break;
       case 'ack': S.ack(m.evId, true, m.ack); break;
+      case 'ackAll': S.ackAll(m.ids, true, m.ack); break;
       case 'op': S.addOp(m.rec, true); break;
       case 'replay': applyReplay(m.mode, m.replay, true); break;
       case 'ov': S.setOverrides(m.ov, true); break;

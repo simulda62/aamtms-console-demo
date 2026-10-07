@@ -53,6 +53,8 @@
       b.dataset.rail === 'assets' ? !document.body.classList.contains('assets-closed') : b.dataset.rail === S.view));
     const un = S.unacked().length;
     ['#tab-badge', '#rail-badge'].forEach(s => { const el = $(s); if (el) { el.hidden = !un; el.textContent = un; } });
+    const bulk = $('#btn-ack-all');
+    if (bulk) { bulk.hidden = !un; $('#ack-all-n').textContent = un; }
     const pos = $('#screen-pos');
     pos.hidden = !S.screenNo;
     if (S.screenNo) pos.textContent = `화면 ${S.screenNo}/${S.screenCount}`;
@@ -414,7 +416,7 @@
   function ackCell(ev) {
     if (S.needsAck(ev)) return `<button type="button" class="btn btn--sm btn--ack" data-ack="${ev.id}">확인</button>`;
     const a = S.acks[ev.id];
-    if (a) return `<span class="muted">확인 ${kst(a.t)}</span>`;
+    if (a) return `<span class="muted">${a.bulk ? '일괄 소거' : '확인'} ${kst(a.t)}</span>`;
     if (C.ACK_REQUIRED.includes(ev.to)) return '<span class="muted">이전 이력</span>';
     return '<span class="muted">—</span>';
   }
