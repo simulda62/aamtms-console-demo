@@ -183,7 +183,7 @@
   // 노드 상자 크기: 영어 표시에서 가장 긴 이름(가상 주입 · 수직속도)과 3줄(이름·식별자·상태)이 잘리지 않는 크기
   const NW = 236, NH = 60, COLW = 292, PADX = 24, TOP = 48;
   // 변환 규칙 묶음: 공통 파라미터별로 묶어 한 줄에 RULE_COLS개씩 옆으로 놓음(ADS-B·LoRa / MANET·가상 주입)
-  const RULE_COLS = 2, RGAPX = 14, RGAPY = 8, RHEAD = 24, RPAD = 10, RGROUP_GAP = 18;
+  const RULE_COLS = 2, RGAPX = 14, RGAPY = 8, RHEAD = 24, RPAD = 10, RGROUP_GAP = 36;
   const RULE_W = RPAD * 2 + RULE_COLS * NW + (RULE_COLS - 1) * RGAPX;
   // 열의 왼쪽 위치. 변환 규칙 열이 넓어진 만큼 오른쪽 열을 밂
   const colX = col => PADX + col * COLW + (col >= 2 ? RULE_W - NW : 0);
