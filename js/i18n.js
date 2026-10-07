@@ -26,7 +26,7 @@
     '모니터 정보 접근이 허용되지 않음. 수동 배치로 진행함.': 'Monitor access was not granted. Continuing with manual placement.',
     '지도 타일을 불러오지 못함. 외부 연결이 없으면 배경을': 'Map tiles failed to load. Without internet, switch the basemap to',
     '가상 예시 절차 · 좌표 임의값': 'Virtual example procedures · arbitrary coordinates',
-    '경로별 수신 기체 비율 · A: ADS-B · T: 텔레메트리': 'Share of aircraft received per path · A: ADS-B · T: Telemetry',
+    '경로별 수신 기체 비율 · A: ADS-B · T: 텔레메트리 · L: LoRa · M: MANET(링크 사용 기체 기준)': 'Share of aircraft received per path · A: ADS-B · T: Telemetry · L: LoRa · M: MANET (of aircraft using the link)',
     '판정 엔진 결과 표시 · 한계값은 절차·정책 데이터': 'engine output · limits from procedure/policy data',
     '연동 창 종료 요청을 받음. 이 창은 닫아도 됨.': 'Close request received. You may close this window.',
     '일치율 평가는 기록 서비스에서 수행함.': 'Agreement rate is evaluated by the recording service.',

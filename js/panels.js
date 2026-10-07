@@ -573,8 +573,15 @@
     const fresh = M.AIRCRAFT.filter(a => S.isFresh(a.id));
     const pct = k => (S.feedStale() ? null : Math.round(fresh.filter(a => S.recs[a.id].paths[k].state === 'ok').length / M.AIRCRAFT.length * 100));
     const el = $('#gauges');
-    el.innerHTML = ring(pct('adsb'), 'A') + ring(pct('tlm'), 'T');
-    el.title = '경로별 수신 기체 비율 · A: ADS-B · T: 텔레메트리';
+    // 링크별 비율은 해당 링크를 쓰는 기체(이중·단일 구성)만 분모로 함
+    const linkPct = name => {
+      if (S.feedStale()) return null;
+      const users = M.AIRCRAFT.filter(a => (S.recs[a.id].paths.tlm.links || []).some(l => l.name === name));
+      if (!users.length) return null;
+      return Math.round(users.filter(a => S.isFresh(a.id) && S.recs[a.id].paths.tlm.links.some(l => l.name === name && l.state === 'ok')).length / users.length * 100);
+    };
+    el.innerHTML = ring(pct('adsb'), 'A') + ring(pct('tlm'), 'T') + ring(linkPct('LoRa'), 'L') + ring(linkPct('MANET'), 'M');
+    el.title = '경로별 수신 기체 비율 · A: ADS-B · T: 텔레메트리 · L: LoRa · M: MANET(링크 사용 기체 기준)';
   }
 
   // ---------- 알림 ----------
