@@ -19,6 +19,8 @@ TMS.config = {
   // 링크 이름은 조회 API·운항계획의 링크 이름(LORA, MANET)을 따름(interfaces/api_format.md, flight_plan_format.md)
   TLM_LINKS: { R01: ['LORA', 'MANET'], V01: ['LORA', 'MANET'], V02: ['MANET'], V03: ['LORA'], V04: ['LORA', 'MANET'], V05: ['MANET'], V06: ['LORA'] },
   TLM_LINK_LABEL: { LORA: 'LoRa', MANET: 'MANET' },
+  // 운항 배정에 링크 구성이 지정되지 않은 기체(telemetry_links = []). 텔레메트리는 위 링크로 받으나 이중화 판정은 하지 않음
+  TLM_CONFIG_UNSET: ['V06'],
   // 버티포트 이착륙 분리: 같은 버티포트에서 착륙·이륙은 한 번에 한 대만 하며, 앞뒤 움직임 사이에 이 간격(초)을 둠
   PAD_SEPARATION_SEC: 30,
   // 노선망 운항 주기(초)와 중심 버티포트 지상 대기(초). 남는 시간은 섬 지상 대기로 씀.

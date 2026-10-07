@@ -465,7 +465,7 @@
     if (ev && ev.kind === 'adsb_mismatch') { ls = 'warning'; lv = `경로 간 위치 차 ${mismatchM(ev).toFixed(0)} m`; }
     set('link', ls, lv);
     // 이중화 상실은 판정 엔진의 정책 규칙 POLICY_RULE_LINK_REDUNDANCY로 옴(수준은 정책값 link_redundancy_level, 시안은 주의)
-    if (ts.lost.length && !ts.allLost && !(ev && ev.kind === 'adsb_mismatch')) r.link.rule = 'POLICY_RULE_LINK_REDUNDANCY';
+    if (ts.lost.length && !ts.allLost && !(ev && ev.kind === 'adsb_mismatch') && !(C.TLM_CONFIG_UNSET || []).includes(ac.id)) r.link.rule = 'POLICY_RULE_LINK_REDUNDANCY';
     set('schedule', 'na', '대응표 미입력');
     set('weather', 'na', '대응표 미입력');
     set('pad', 'na', '대응표 미입력');
@@ -508,7 +508,9 @@
       tlmPaths[`TELEMETRY/${name}`] = { state: lost ? 'lost' : 'ok', t_last: tl, lat: ll[0], lon: ll[1], alt_ft: kl.alt };
       links[name] = { age_ms: t - tl, missed_cycles: Math.floor((t - tl) / 200) };
     });
-    const reasons = ts.dual && ts.lost.length && !ts.allLost ? ['LINK_REDUNDANCY_LOST'] : [];
+    // 구성 미지정(telemetry_links = [])이면 이중화 판정을 하지 않음
+    const unset = (C.TLM_CONFIG_UNSET || []).includes(ac.id);
+    const reasons = !unset && ts.dual && ts.lost.length && !ts.allLost ? ['LINK_REDUNDANCY_LOST'] : [];
     const ta = Math.floor(t / 500) * 500;
     const ka = kin(ac, ta);
     let ae = ka.e, an = ka.n;
@@ -532,8 +534,8 @@
       status: j.status, cause: j.cause, items: j.items, reasons,
       fused: { lat, lon, alt_ft: k.alt, gs_kt: k.gs, vs_fpm: k.vs, hdg: k.hdg, ground: k.ground, links },
       paths: { ADSB: adsb, ...tlmPaths }, fusion, proc,
-      // 기체별 텔레메트리 구성: 배정 tlm_links·운항계획 telemetryLinks에 있으나 조회 API 상태 JSON에는 아직 없음(화면 요청 항목)
-      telemetry_links: ts.links,
+      // 기체별 텔레메트리 구성(조회 API telemetry_links, 운항 배정 순서). 미배정·구성 미지정은 빈 목록
+      telemetry_links: unset ? [] : ts.links,
       versions: { procedure: proc.id ? `${proc.id} v${proc.ver}` : '—', policy: VERSIONS.policy, ruleset: VERSIONS.ruleset },
       sig: sigBad ? 'mock-tampered' : 'mock-valid',
     };

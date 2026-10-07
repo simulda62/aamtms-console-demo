@@ -261,7 +261,7 @@
       const rw = raws[ac.id];
       if (fresh && (ac.id === sel || r.fusion.flag === 'mismatch')) {
         const a = r.paths.ADSB;
-        const t = (r.telemetry_links || []).map(n => r.paths[`TELEMETRY/${n}`]).find(p => p && p.state === 'ok');
+        const t = Object.keys(r.paths).filter(k => k.startsWith('TELEMETRY/')).map(k => r.paths[k]).find(p => p.state === 'ok');
         rw.adsb.setLatLng([a.lat, a.lon]).addTo(rawLayer);
         if (t) rw.tlm.setLatLng([t.lat, t.lon]).addTo(rawLayer); else rawLayer.removeLayer(rw.tlm);
         if (r.fusion.flag === 'mismatch') rw.link.setLatLngs([[a.lat, a.lon], [r.fused.lat, r.fused.lon]]).addTo(rawLayer);

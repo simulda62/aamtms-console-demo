@@ -83,6 +83,7 @@
     '텔레메트리 MANET 링크 지상 노드': 'Telemetry MANET ground node',
     ' 단독(이중화 상실)': ' only (redundancy lost)',
     '텔레메트리 구성': 'Telemetry links',
+    '미지정(이중화 판정 안 함)': 'Unspecified (no redundancy check)',
     '이중화 상실': 'Redundancy lost',
     'MANET 노드': 'MANET node',
     '이중': 'Dual',
