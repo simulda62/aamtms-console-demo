@@ -419,7 +419,8 @@
   const mismatchM = ev => 450 * Math.min(1, ev.u / 2);
 
   // 텔레메트리 링크 상태: 구성(이중/단일)과 두절된 링크
-  const linksOf = ac => (C.TLM_LINKS && C.TLM_LINKS[ac.id]) || ['LoRa'];
+  const linksOf = ac => (C.TLM_LINKS && C.TLM_LINKS[ac.id]) || ['LORA'];
+  const linkLabel = name => (C.TLM_LINK_LABEL && C.TLM_LINK_LABEL[name]) || name;
   function tlmState(ac, ev) {
     const links = linksOf(ac);
     let lost = [];
@@ -460,9 +461,11 @@
     let ls = 'normal', lv = '두 경로 정상';
     const ts = tlmState(ac, ev);
     if (ts.allLost) { ls = 'caution'; lv = '텔레메트리 두절, ADS-B 단독 감시'; }
-    else if (ts.lost.length) { ls = 'caution'; lv = `${ts.lost[0]} 두절, ${ts.links.find(l => !ts.lost.includes(l))} 단독(이중화 상실)`; }
+    else if (ts.lost.length) { ls = 'caution'; lv = `${linkLabel(ts.lost[0])} 두절, ${linkLabel(ts.links.find(l => !ts.lost.includes(l)))} 단독(이중화 상실)`; }
     if (ev && ev.kind === 'adsb_mismatch') { ls = 'warning'; lv = `경로 간 위치 차 ${mismatchM(ev).toFixed(0)} m`; }
     set('link', ls, lv);
+    // 이중화 상실은 판정 엔진의 정책 규칙 POLICY_RULE_LINK_REDUNDANCY로 옴(수준은 정책값 link_redundancy_level, 시안은 주의)
+    if (ts.lost.length && !ts.allLost && !(ev && ev.kind === 'adsb_mismatch')) r.link.rule = 'POLICY_RULE_LINK_REDUNDANCY';
     set('schedule', 'na', '대응표 미입력');
     set('weather', 'na', '대응표 미입력');
     set('pad', 'na', '대응표 미입력');
@@ -489,21 +492,23 @@
     const j = evalItems(ac, t, k, nearest);
     const ev = k.ev;
 
-    // 두 입력 경로 (텔레메트리 0.2초, ADS-B 0.5초 갱신 가정)
-    // 텔레메트리: 링크별 수신 상태. 모든 링크가 끊기면 텔레메트리 두절(마지막 수신 위치 유지)
+    // 입력 경로 (텔레메트리 0.2초, ADS-B 0.5초 갱신 가정)
+    // 경로·링크 이름은 조회 API 상태 JSON(interfaces/api_format.md)을 따름:
+    //   paths 키 ADSB·TELEMETRY/LORA·TELEMETRY/MANET, fused.links.LORA·MANET {age_ms, missed_cycles}(받은 적 없으면 null),
+    //   이중화 상실은 판정 사유 LINK_REDUNDANCY_LOST
+    // 끊긴 링크는 마지막 수신 위치를 유지함
     const ts = tlmState(ac, ev);
-    let tlm;
-    if (ts.allLost) {
-      const kl = kin(ac, ev.start);
-      const ll = toLL(kl.e, kl.n);
-      tlm = { state: 'lost', t_last: ev.start, lat: ll[0], lon: ll[1], alt_ft: kl.alt };
-    } else {
-      tlm = { state: 'ok', t_last: t, lat, lon, alt_ft: k.alt };
-    }
-    tlm.config = ts.dual ? 'dual' : 'single';
-    tlm.links = ts.links.map(name => (ts.lost.includes(name)
-      ? { name, state: 'lost', t_last: ev.start }
-      : { name, state: 'ok', t_last: t }));
+    const tlmPaths = {};
+    const links = { LORA: null, MANET: null };
+    ts.links.forEach(name => {
+      const lost = ts.lost.includes(name);
+      const tl = lost ? ev.start : t;
+      const kl = lost ? kin(ac, ev.start) : k;
+      const ll = lost ? toLL(kl.e, kl.n) : [lat, lon];
+      tlmPaths[`TELEMETRY/${name}`] = { state: lost ? 'lost' : 'ok', t_last: tl, lat: ll[0], lon: ll[1], alt_ft: kl.alt };
+      links[name] = { age_ms: t - tl, missed_cycles: Math.floor((t - tl) / 200) };
+    });
+    const reasons = ts.dual && ts.lost.length && !ts.allLost ? ['LINK_REDUNDANCY_LOST'] : [];
     const ta = Math.floor(t / 500) * 500;
     const ka = kin(ac, ta);
     let ae = ka.e, an = ka.n;
@@ -512,7 +517,7 @@
     const adsb = { state: 'ok', t_last: ta, lat: all[0], lon: all[1], alt_ft: ka.alt };
     let fusion;
     if (ev && ev.kind === 'adsb_mismatch') fusion = { flag: 'mismatch', diff_m: mismatchM(ev) };
-    else if (tlm.state !== 'ok') fusion = { flag: 'single', diff_m: null };
+    else if (ts.allLost) fusion = { flag: 'single', diff_m: null };
     else fusion = { flag: 'ok', diff_m: 5 + 3 * Math.sin(t / 3000 + ac.phase) };
 
     let proc;
@@ -524,9 +529,11 @@
     const sigBad = ov && ov.sig && inWin(ov.sig[ac.id], t);
     return {
       id: ac.id, virtual: ac.virtual, type: ac.type, t, info_state: 'valid',
-      status: j.status, cause: j.cause, items: j.items,
-      fused: { lat, lon, alt_ft: k.alt, gs_kt: k.gs, vs_fpm: k.vs, hdg: k.hdg, ground: k.ground },
-      paths: { adsb, tlm }, fusion, proc,
+      status: j.status, cause: j.cause, items: j.items, reasons,
+      fused: { lat, lon, alt_ft: k.alt, gs_kt: k.gs, vs_fpm: k.vs, hdg: k.hdg, ground: k.ground, links },
+      paths: { ADSB: adsb, ...tlmPaths }, fusion, proc,
+      // 기체별 텔레메트리 구성: 배정 tlm_links·운항계획 telemetryLinks에 있으나 조회 API 상태 JSON에는 아직 없음(화면 요청 항목)
+      telemetry_links: ts.links,
       versions: { procedure: proc.id ? `${proc.id} v${proc.ver}` : '—', policy: VERSIONS.policy, ruleset: VERSIONS.ruleset },
       sig: sigBad ? 'mock-tampered' : 'mock-valid',
     };

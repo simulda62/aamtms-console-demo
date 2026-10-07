@@ -7,6 +7,9 @@
   const kstMs = ms => `${kst(ms)}.${Math.floor(new Date(ms).getMilliseconds() / 100)}`;
   const ago = ms => F.age(ms).replace(' 전', '');
   const SIG_RECENT_MS = 10000;
+  // 텔레메트리 링크: 구성(telemetry_links)과 링크별 경로(paths['TELEMETRY/LORA'] 등)
+  const tlmLinks = r => (r && r.telemetry_links || []).map(name => ({ name, label: (TMS.config.TLM_LINK_LABEL || {})[name] || name, ...(r.paths[`TELEMETRY/${name}`] || { state: 'lost' }) }));
+  const tlmOk = r => tlmLinks(r).some(l => l.state === 'ok');
   const stText = st => `<span class="st-text st-text--${st}">${ST[st].label}</span>`;
   const stTag = st => `<span class="st-tag st-tag--${st}">${ST[st].label}</span>`;
   const sigRecent = id => S.mode === 'live' && S.sigFail[id] && S.now - S.sigFail[id] < SIG_RECENT_MS;
@@ -194,10 +197,10 @@
       row.querySelector('.n-gs').textContent = fresh ? `${Math.round(r.fused.gs_kt)} kt` : '—';
       row.querySelector('.n-vs').textContent = fresh ? `${Math.round(r.fused.vs_fpm)} fpm` : '—';
       row.querySelector('.asset__paths').innerHTML = fresh
-        ? `<span class="path path--${r.paths.adsb.state}" title="ADS-B">A</span>`
-          + (r.paths.tlm.links || []).map(l => `<span class="path path--${l.state}" title="텔레메트리 ${l.name}">${l.name[0]}</span>`).join('')
+        ? `<span class="path path--${r.paths.ADSB.state}" title="ADS-B">A</span>`
+          + tlmLinks(r).map(l => `<span class="path path--${l.state}" title="텔레메트리 ${l.label}">${l.label[0]}</span>`).join('')
           + (r.fusion.flag === 'mismatch' ? '<span class="path path--mismatch" title="경로 간 불일치">≠</span>' : '')
-        : '<span class="path path--nodata">A</span>' + (r ? (r.paths.tlm.links || []).map(l => `<span class="path path--nodata">${l.name[0]}</span>`).join('') : '');
+        : '<span class="path path--nodata">A</span>' + tlmLinks(r).map(l => `<span class="path path--nodata">${l.label[0]}</span>`).join('');
       const hay = `${ac.id} ${ac.type} ${r ? r.proc.label : ''} ${ac.virtual ? '가상' : '실기체'}`.toLowerCase();
       row.hidden = (listFilter === 'real' && ac.virtual) || (listFilter === 'virtual' && !ac.virtual) || (!!query && !hay.includes(query));
       if (!row.hidden) shown++;
@@ -328,8 +331,8 @@
       : fresh ? `판정 시각 <b class="mono">${kstMs(r.t)}</b> KST · ${F.age(S.now - r.t)} 수신<br>ID <b>${id}</b> · ${byId[id].type}`
         : `마지막 유효 수신 <b class="mono">${kstMs(r.t)}</b> KST · <span class="st-text--nodata">${ago(S.now - r.t)} 경과</span><br>ID <b>${id}</b> · ${byId[id].type}`;
     const pa = r && fresh ? r.paths : null;
-    q('pathicon').innerHTML = `<svg viewBox="0 0 20 20" class="halves"><path class="${pa && pa.adsb.state === 'ok' ? 'on' : 'off'}" d="M10 2a8 8 0 0 0 0 16z"/><path class="${pa && pa.tlm.state === 'ok' ? 'on' : 'off'}" d="M10 2a8 8 0 0 1 0 16z"/></svg>
-      <span>ADS-B ${pa ? (pa.adsb.state === 'ok' ? '수신' : '두절') : '—'}${(r ? r.paths.tlm.links || [] : []).map(l => ` · ${l.name} ${pa ? (l.state === 'ok' ? '수신' : '두절') : '—'}`).join('')}${pa && r.fusion.flag === 'mismatch' ? ' · <b class="st-text--emergency">불일치</b>' : ''}</span>`;
+    q('pathicon').innerHTML = `<svg viewBox="0 0 20 20" class="halves"><path class="${pa && pa.ADSB.state === 'ok' ? 'on' : 'off'}" d="M10 2a8 8 0 0 0 0 16z"/><path class="${pa && tlmOk(r) ? 'on' : 'off'}" d="M10 2a8 8 0 0 1 0 16z"/></svg>
+      <span>ADS-B ${pa ? (pa.ADSB.state === 'ok' ? '수신' : '두절') : '—'}${tlmLinks(r).map(l => ` · ${l.label} ${pa ? (l.state === 'ok' ? '수신' : '두절') : '—'}`).join('')}${pa && r.fusion.flag === 'mismatch' ? ' · <b class="st-text--emergency">불일치</b>' : ''}</span>`;
 
     const dash = '—';
     q('data').innerHTML = r ? kv([
@@ -339,7 +342,7 @@
       ['진행 방향', fresh ? `${Math.round(r.fused.hdg)}°` : dash],
       ['위치', fresh ? `${r.fused.lat.toFixed(5)}°,<br>${r.fused.lon.toFixed(5)}°` : dash],
       ['마지막 수신', fresh ? ago(S.now - r.t) : `<span class="st-text--nodata">${ago(S.now - r.t)} 경과</span>`],
-      ['데이터 출처', r.virtual ? '가상 주입' : `ADS-B · 텔레메트리(${(r.paths.tlm.links || []).map(l => l.name).join('+')})`],
+      ['데이터 출처', r.virtual ? '가상 주입' : `ADS-B · 텔레메트리(${tlmLinks(r).map(l => l.label).join('+')})`],
       ['절차·구간', fresh ? r.proc.label : dash],
     ]) : '<p class="muted">수신 이력 없음</p>';
 
@@ -359,9 +362,8 @@
       else if (r.fusion.flag === 'single') fus = '<span class="st-text--warning">단일 경로 감시</span> · 텔레메트리 두절, ADS-B로 감시 지속';
       else fus = `<span class="st-text--emergency">불일치</span> · 경로 간 차 ${r.fusion.diff_m.toFixed(0)} m · 데이터 이상`;
       q('paths').innerHTML = `<table class="tbl"><thead><tr><th>경로</th><th>상태</th><th>마지막 수신</th><th class="r">경과</th><th>위치·고도</th></tr></thead>
-        <tbody>${row('ADS-B', '저신뢰', r.paths.adsb)}${(r.paths.tlm.links || []).map(l => row(`텔레메트리 ${l.name}`, l.name === 'LoRa' ? 'LoRa 전용 링크' : 'MANET(이동 애드혹 망)',
-          { ...l, lat: r.paths.tlm.lat, lon: r.paths.tlm.lon, alt_ft: r.paths.tlm.alt_ft })).join('')}</tbody></table>
-        <p class="fusion">텔레메트리 구성 · ${r.paths.tlm.config === 'dual' ? `이중(${r.paths.tlm.links.map(l => l.name).join('+')})` : `단일(${r.paths.tlm.links[0].name})`}${r.paths.tlm.config === 'dual' && fresh && r.paths.tlm.links.some(l => l.state !== 'ok') && r.paths.tlm.state === 'ok' ? ' · <span class="st-text--warning">이중화 상실</span>' : ''}</p>
+        <tbody>${row('ADS-B', '저신뢰', r.paths.ADSB)}${tlmLinks(r).map(l => row(`텔레메트리 ${l.label}`, l.name === 'LORA' ? 'LoRa 전용 링크' : 'MANET(이동 애드혹 망)', l)).join('')}</tbody></table>
+        <p class="fusion">텔레메트리 구성 · ${tlmLinks(r).length > 1 ? `이중(${tlmLinks(r).map(l => l.label).join('+')})` : `단일(${tlmLinks(r).map(l => l.label).join('')})`}${fresh && (r.reasons || []).includes('LINK_REDUNDANCY_LOST') ? ' · <span class="st-text--warning">이중화 상실</span>' : ''}</p>
         <p class="fusion">위치 융합 · ${fus}</p>${r.virtual ? '<p class="hint">가상기체는 무선 구간을 거치지 않고 입력단에 같은 형식으로 주입됨.</p>' : ''}`;
     } else q('paths').innerHTML = '<p class="muted">수신 이력 없음</p>';
 
@@ -571,16 +573,16 @@
   }
   function updateGauges() {
     const fresh = M.AIRCRAFT.filter(a => S.isFresh(a.id));
-    const pct = k => (S.feedStale() ? null : Math.round(fresh.filter(a => S.recs[a.id].paths[k].state === 'ok').length / M.AIRCRAFT.length * 100));
+    const share = ok => (S.feedStale() ? null : Math.round(fresh.filter(a => ok(S.recs[a.id])).length / M.AIRCRAFT.length * 100));
     const el = $('#gauges');
     // 링크별 비율은 해당 링크를 쓰는 기체(이중·단일 구성)만 분모로 함
     const linkPct = name => {
       if (S.feedStale()) return null;
-      const users = M.AIRCRAFT.filter(a => (S.recs[a.id].paths.tlm.links || []).some(l => l.name === name));
+      const users = M.AIRCRAFT.filter(a => (S.recs[a.id].telemetry_links || []).includes(name));
       if (!users.length) return null;
-      return Math.round(users.filter(a => S.isFresh(a.id) && S.recs[a.id].paths.tlm.links.some(l => l.name === name && l.state === 'ok')).length / users.length * 100);
+      return Math.round(users.filter(a => S.isFresh(a.id) && (S.recs[a.id].paths[`TELEMETRY/${name}`] || {}).state === 'ok').length / users.length * 100);
     };
-    el.innerHTML = ring(pct('adsb'), 'A') + ring(pct('tlm'), 'T') + ring(linkPct('LoRa'), 'L') + ring(linkPct('MANET'), 'M');
+    el.innerHTML = ring(share(r => r.paths.ADSB.state === 'ok'), 'A') + ring(share(tlmOk), 'T') + ring(linkPct('LORA'), 'L') + ring(linkPct('MANET'), 'M');
     el.title = '경로별 수신 기체 비율 · A: ADS-B · T: 텔레메트리 · L: LoRa · M: MANET(링크 사용 기체 기준)';
   }
 
