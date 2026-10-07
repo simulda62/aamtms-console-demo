@@ -101,14 +101,24 @@
     sel.innerHTML = M.AIRCRAFT.map(a => `<option value="${a.id}">${a.id}${a.virtual ? ' (가상)' : ''}</option>`).join('');
     $('#demo-feed').addEventListener('change', e => S.setFeedDown(e.target.checked));
     // 시안 전용 일괄 소거(상태줄 구석 단추와 시안 제어). 묻고 나서 모든 연동 창에 적용함
-    const ackAll = () => {
-      const n = S.unacked().length;
-      if (!n) { TMS.panels.toast('미확인 경보 없음'); return; }
-      if (!confirm(TMS.i18n.t(`미확인 경보 ${n}건을 모두 확인 처리함(데모 전용 일괄 소거). 계속할까요?`))) return;
+    // 브라우저 확인 창(confirm)은 내장 브라우저·전체 화면 등에서 막혀 바로 '취소'가 되므로, 화면 안에서 두 번 눌러 실행함
+    // 첫 번째 누름: "한 번 더 누르면 소거"로 바뀜(4초 안에 다시 누르면 실행, 지나면 원래대로)
+    const bulkBtns = ['#btn-ack-all', '#demo-ack-all'].map(s => $(s));
+    let armTimer = null;
+    const disarm = () => { clearTimeout(armTimer); bulkBtns.forEach(b => b.classList.remove('is-armed')); };
+    const ackAll = e => {
+      const btn = e.currentTarget;
+      if (!S.unacked().length) { disarm(); TMS.panels.toast('미확인 경보 없음'); return; }
+      if (!btn.classList.contains('is-armed')) {
+        disarm();
+        btn.classList.add('is-armed');
+        armTimer = setTimeout(disarm, 4000);
+        return;
+      }
+      disarm();
       TMS.panels.toast(`일괄 소거 완료: 미확인 경보 ${S.ackAll()}건`);
     };
-    $('#btn-ack-all').addEventListener('click', ackAll);
-    $('#demo-ack-all').addEventListener('click', ackAll);
+    bulkBtns.forEach(b => b.addEventListener('click', ackAll));
     $('#demo-loss').addEventListener('click', () => { S.simLoss(sel.value); TMS.panels.toast(`${sel.value} 수신 두절 10초 모사`); });
     $('#demo-sig').addEventListener('click', () => { S.simSigFail(sel.value); TMS.panels.toast(`${sel.value} 서명 검증 실패 10초 모사`); });
     S.on(() => {

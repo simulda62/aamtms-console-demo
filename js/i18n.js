@@ -349,6 +349,7 @@
     '일괄 소거는 장시간 시연용 데모 기능이며 운영 제품에는 두지 않음.': 'Bulk clear is a demo-only feature for long-running demos and is not in the product.',
     '데모 전용(장시간 시연용). 운영 제품에는 없음': 'Demo only (for long-running demos). Not in the product',
     '미확인 경보 일괄 소거': 'Clear all unacked alerts',
+    '한 번 더 누르면 소거': 'Click again to clear',
     '건 일괄 소거': ' · clear all',
     '일괄 소거 완료: ': 'Bulk clear done: ',
     '일괄 소거': 'Clear all',

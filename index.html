@@ -7,13 +7,13 @@
 <!-- 지도 라이브러리·웹 글꼴은 vendor/에 함께 둠(오프라인판). 외부 자원은 지도 타일뿐이며, 운영 환경(망 분리)에서는 타일도 내부에 두어야 함. -->
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="css/console.css?v=f2d0e75">
+<link rel="stylesheet" href="css/console.css?v=b3dfdf6">
 </head>
 <body data-view="main">
 
 <!-- 상단 표시줄 -->
 <header class="topbar">
-  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=f2d0e75" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
+  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=b3dfdf6" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
   <nav class="tabs" id="tabs"></nav>
   <div class="top-right">
     <span class="screen-pos" id="screen-pos" hidden></span>
@@ -59,7 +59,7 @@
   <span class="chip" id="chip-sig" title="수신 메시지 서명 검증">서명 검증<b>—</b></span>
   <span class="chip" title="적용 중인 정책 버전">정책<b class="mono">POL-가상-0.3</b></span>
   <span class="chip" id="chip-peers" title="연동된 화면 창 수">연동 창<b>1개</b></span>
-  <button type="button" class="btn btn--sm btn--bulk" id="btn-ack-all" hidden title="데모 전용(장시간 시연용). 운영 제품에는 없음">미확인 <b id="ack-all-n">0</b>건 일괄 소거</button>
+  <button type="button" class="btn btn--sm btn--bulk" id="btn-ack-all" hidden title="데모 전용(장시간 시연용). 운영 제품에는 없음"><span class="bulk-idle">미확인 <b id="ack-all-n">0</b>건 일괄 소거</span><span class="bulk-armed">한 번 더 누르면 소거</span></button>
   <span class="clock"><b class="mono" id="clock-kst">--:--:--</b> KST <b class="mono" id="clock-utc">--:--:--</b> UTC</span>
 </div>
 
@@ -361,7 +361,7 @@
     </ul>
   </div>
   <div class="demo__row">
-    <button type="button" class="btn" id="demo-ack-all">미확인 경보 일괄 소거</button>
+    <button type="button" class="btn btn--bulk-demo" id="demo-ack-all"><span class="bulk-idle">미확인 경보 일괄 소거</span><span class="bulk-armed">한 번 더 누르면 소거</span></button>
   </div>
   <p class="hint">일괄 소거는 장시간 시연용 데모 기능이며 운영 제품에는 두지 않음.</p>
   <div class="demo__script" id="demo-offline" hidden>
@@ -375,13 +375,13 @@
 <div class="closed-overlay">연동 창 종료 요청을 받음. 이 창은 닫아도 됨.</div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="js/config.js?v=f2d0e75"></script>
-<script src="js/i18n.js?v=f2d0e75"></script>
-<script src="js/mock_source.js?v=f2d0e75"></script>
-<script src="js/store.js?v=f2d0e75"></script>
-<script src="js/map_view.js?v=f2d0e75"></script>
-<script src="js/panels.js?v=f2d0e75"></script>
-<script src="js/ontology.js?v=f2d0e75"></script>
-<script src="js/app.js?v=f2d0e75"></script>
+<script src="js/config.js?v=b3dfdf6"></script>
+<script src="js/i18n.js?v=b3dfdf6"></script>
+<script src="js/mock_source.js?v=b3dfdf6"></script>
+<script src="js/store.js?v=b3dfdf6"></script>
+<script src="js/map_view.js?v=b3dfdf6"></script>
+<script src="js/panels.js?v=b3dfdf6"></script>
+<script src="js/ontology.js?v=b3dfdf6"></script>
+<script src="js/app.js?v=b3dfdf6"></script>
 </body>
 </html>

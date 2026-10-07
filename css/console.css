@@ -167,6 +167,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .btn--bulk { flex-shrink: 0; margin-left: auto; font-size: 11px; padding: 1px 8px; color: var(--muted); background: transparent; border: 1px dashed var(--line-2); }
 .btn--bulk b { color: var(--warning); font-weight: 600; margin: 0 2px; }
 .btn--bulk:hover { color: var(--text); border-color: var(--muted); }
+/* 일괄 소거는 두 번 눌러 실행함(브라우저 확인 창이 막힌 환경에서도 동작하도록 화면 안에서 확인) */
+.bulk-armed { display: none; }
+.is-armed .bulk-idle { display: none; }
+.is-armed .bulk-armed { display: inline; }
+.btn--bulk.is-armed, .btn--bulk-demo.is-armed { color: var(--warning); border: 1px solid var(--warning); }
 .btn--bulk:not([hidden]) + .clock { margin-left: 12px; }
 .clock { flex-shrink: 0; margin-left: auto; font-size: 11px; color: var(--muted); letter-spacing: .04em; }
 .clock b { color: var(--text); font-size: 12.5px; font-weight: 500; margin-left: 10px; }
