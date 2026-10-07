@@ -43,6 +43,8 @@ TMS.config = {
   PEER_EXPIRE_MS: 3500,
   // 확인이 필요한 상태 전환
   ACK_REQUIRED: ['warning', 'emergency', 'nodata'],
+  // 지도 경보 띠: 확인하지 않아도 발생 후 이 시간(초)이 지나면 띠에서 내림. 미확인 상태는 경보·이벤트 목록과 탭 숫자에 그대로 남음
+  ALERT_STRIP_HIDE_SEC: 300,
   OPERATOR: '관제 요원(시안)',
 };
 

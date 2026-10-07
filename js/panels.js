@@ -563,9 +563,11 @@
   // ---------- 지도 위 경보·수신 표시 ----------
   function updateAlerts() {
     const el = $('#alert-strip');
-    const un = S.unacked();
+    // 5분(설정)이 지난 미확인 경보는 띠에서 내림(확인 요구는 유지: 경보·이벤트 목록, 탭 숫자)
+    const hideMs = (C.ALERT_STRIP_HIDE_SEC || 300) * 1000;
+    const un = S.unacked().filter(ev => S.now - ev.t < hideMs);
     const bad = S.feedStale() && S.mode === 'live';
-    const key = `${S.evVersion}|${un.length}|${bad}`;
+    const key = `${S.evVersion}|${un.map(ev => ev.id).join(',')}|${bad}`;
     if (el.dataset.key === key) return;
     el.dataset.key = key;
     const top = un.slice().sort((a, b) => ST[a.to].rank - ST[b.to].rank || b.t - a.t).slice(0, 3);
