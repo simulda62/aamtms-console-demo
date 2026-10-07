@@ -182,21 +182,32 @@
   };
   // 노드 상자 크기: 영어 표시에서 가장 긴 이름(가상 주입 · 수직속도)과 3줄(이름·식별자·상태)이 잘리지 않는 크기
   const NW = 236, NH = 60, COLW = 292, PADX = 24, TOP = 48;
+  // 변환 규칙 묶음: 공통 파라미터별로 묶어 한 줄에 RULE_COLS개씩 옆으로 놓음(ADS-B·LoRa / MANET·가상 주입)
+  const RULE_COLS = 2, RGAPX = 14, RGAPY = 8, RHEAD = 24, RPAD = 10, RGROUP_GAP = 18;
+  const RULE_W = RPAD * 2 + RULE_COLS * NW + (RULE_COLS - 1) * RGAPX;
+  // 열의 왼쪽 위치. 변환 규칙 열이 넓어진 만큼 오른쪽 열을 밂
+  const colX = col => PADX + col * COLW + (col >= 2 ? RULE_W - NW : 0);
   const posOf = id => O.pos[id] || O.auto[id];
 
   // 보이는 노드만으로 배치함(필터·선택 계보에서도 빈자리 없이 모음). 사용자가 옮긴 위치(O.pos)가 우선함
   function autoLayout(vis) {
     const P = {};
-    const x = col => PADX + col * COLW;
+    const x = colX;
     const on = id => vis.has(id);
-    // 변환 규칙: 공통 파라미터별로 묶어 원천 순으로 쌓음
+    // 변환 규칙: 공통 파라미터별 묶음 상자 안에 원천 순으로 옆으로 놓고, 묶음을 위에서 아래로 쌓음
     let y = TOP;
+    const groups = [];
     PARAMS.forEach(p => {
       const rules = SENSORS.map(src => `rule.${src}.${p.key}`).filter(id => byId[id] && on(id));
       if (!rules.length) return;
-      rules.forEach(id => { P[id] = [x(1), y]; y += NH + 8; });
-      y += 16;
+      const cols = Math.min(RULE_COLS, rules.length);
+      const rows = Math.ceil(rules.length / cols);
+      rules.forEach((id, i) => { P[id] = [x(1) + RPAD + (i % cols) * (NW + RGAPX), y + RHEAD + Math.floor(i / cols) * (NH + RGAPY)]; });
+      const h = RHEAD + rows * (NH + RGAPY) - RGAPY + RPAD;
+      groups.push({ param: p, n: rules.length, x: x(1), y, w: RPAD * 2 + cols * NW + (cols - 1) * RGAPX, h });
+      y += h + RGROUP_GAP;
     });
+    O.groups = groups;
     // 원천: 수신 원천을 위에, 정의 데이터 원천을 아래에 둠
     const srcs = SOURCES.map(s => `src.${s.id}`).filter(on);
     srcs.forEach((id, i) => { P[id] = [x(0), TOP + i * (NH + 64) + (SENSORS.includes(byId[id].src) ? 0 : 60)]; });
@@ -219,7 +230,7 @@
   function sizeWorld() {
     let maxX = 0, maxY = 0;
     NODES.forEach(n => { if (!O.vis.has(n.id)) return; const p = posOf(n.id); maxX = Math.max(maxX, p[0] + NW); maxY = Math.max(maxY, p[1] + NH); });
-    O.size = [Math.max(maxX, PADX + 8 * COLW) + PADX, maxY + 40];
+    O.size = [Math.max(maxX, colX(7) + NW) + PADX, maxY + 40];
     const world = $('#og-world'), svg = $('#og-edges');
     world.style.width = `${O.size[0]}px`;
     world.style.height = `${O.size[1]}px`;
@@ -296,13 +307,18 @@
   const nodeEls = {};
   const glyph = (type, cls = 'og-gl') => `<svg class="${cls}" viewBox="0 0 16 16">${TYPES[type].ico}</svg>`;
   function buildGraph() {
-    $('#og-cols').innerHTML = Object.values(TYPES).map(t => `<span class="og-colhead" style="left:${PADX + t.col * COLW}px">${t.label}</span>`).join('');
+    $('#og-cols').innerHTML = Object.values(TYPES).map(t => `<span class="og-colhead" style="left:${colX(t.col)}px">${t.label}</span>`).join('');
     $('#og-nodes').innerHTML = NODES.map(n => `<div class="og-node og-node--${n.type}${n.mark ? ` og-node--${n.mark}` : ''}" data-id="${n.id}" title="${esc(n.name)}">
       <div class="og-node__l1">${glyph(n.type)}<b>${esc(n.name)}</b></div>
       <div class="og-node__l2">${esc(n.sub)}</div>
       <div class="og-node__l3" data-st></div>
       <i class="og-port og-port--in"></i><i class="og-port og-port--out"></i></div>`).join('');
     $('#og-nodes').querySelectorAll('.og-node').forEach(el => { nodeEls[el.dataset.id] = el; });
+  }
+  // 변환 규칙 묶음 상자(공통 파라미터 이름 · 규칙 수). 누르면 해당 공통 파라미터를 고름
+  function drawGroups() {
+    $('#og-groups').innerHTML = (O.groups || []).map(g => `<div class="og-group" data-go="par.${g.param.id}" style="left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px">
+      <span class="og-group__head">${glyph('param')}<b>${esc(g.param.name)}</b><em class="mono">${g.param.id}</em><span class="og-group__n mono">${g.n}</span></span></div>`).join('');
   }
   function placeNode(id) {
     const p = posOf(id), el = nodeEls[id];
@@ -401,6 +417,7 @@
     if (O.layoutKey !== [...O.vis].sort().join(',')) {
       autoLayout(O.vis);
       NODES.forEach(n => placeNode(n.id));
+      drawGroups();
       sizeWorld();
     }
     O.lin = O.sel ? lineage(O.sel) : null;
@@ -416,6 +433,12 @@
       el.classList.toggle('is-match', !!q && m);
     });
     drawEdges();
+    // 묶음 상자: 묶인 규칙이 모두 흐리게 표시되면 상자도 흐리게 함
+    document.querySelectorAll('#og-groups .og-group').forEach(g => {
+      const rules = NODES.filter(n => n.type === 'rule' && `par.${parByKey[n.pkey].id}` === g.dataset.go && O.vis.has(n.id));
+      g.classList.toggle('is-dim', rules.every(n => nodeEls[n.id].classList.contains('is-dim')));
+      g.classList.toggle('is-lit', !!O.lin && rules.some(n => O.lin.all.has(n.id)));
+    });
     $('#og-count').textContent = `${O.vis.size} / ${NODES.length} 노드`;
     $('#og-chip-mode').textContent = O.lineage === 'selected' ? (O.sel ? '선택 계보' : '선택 계보 · 노드를 고를 것') : '전체 계보';
     document.querySelectorAll('#og-lineage [data-l]').forEach(b => b.classList.toggle('is-on', b.dataset.l === O.lineage));
@@ -455,9 +478,12 @@
       const list = all.filter(n => !q || matches(n, q));
       if (q && !list.length) return '';
       const closed = !q && O.closed[type];
+      let lastP = null;
       const items = closed ? '' : list.map(n => {
+        const sub = type === 'rule' && n.pkey !== lastP ? `<div class="ox-sub">${esc(parByKey[n.pkey].name)}</div>` : '';
+        if (type === 'rule') lastP = n.pkey;
         const rules = type === 'source' ? (OUT[n.id] || []).filter(e => byId[e.to].type === 'rule').length : 0;
-        return `<div class="ox-item${n.id === O.sel ? ' is-selected' : ''}${O.vis.has(n.id) ? '' : ' is-hidden'}" data-id="${n.id}">
+        return `${sub}<div class="ox-item${n.id === O.sel ? ' is-selected' : ''}${O.vis.has(n.id) ? '' : ' is-hidden'}" data-id="${n.id}">
           ${glyph(type)}<span class="ox-item__name">${esc(n.name)}</span>${type === 'source' ? `<i class="ox-dot" data-src="${n.src}"></i>` : '<span></span>'}
           ${rules ? `<small>+ 변환 규칙 <b class="mono">${rules}</b></small>` : ''}</div>`;
       }).join('');
@@ -667,8 +693,9 @@
     cv.addEventListener('pointerdown', e => {
       if (e.button !== 0 || e.target.closest('.og-ui')) return;
       const nodeEl = e.target.closest('.og-node');
+      const groupEl = nodeEl ? null : e.target.closest('.og-group');
       const id = nodeEl ? nodeEl.dataset.id : null;
-      drag = { x: e.clientX, y: e.clientY, moved: false, id, node: id && O.tool === 'select' ? id : null, tx: O.tx, ty: O.ty };
+      drag = { x: e.clientX, y: e.clientY, moved: false, id: id || (groupEl ? groupEl.dataset.go : null), node: id && O.tool === 'select' ? id : null, tx: O.tx, ty: O.ty };
       if (drag.node) drag.p = posOf(id).slice();
       cv.setPointerCapture(e.pointerId);
     });
