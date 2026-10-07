@@ -104,7 +104,7 @@
     const ackAll = () => {
       const n = S.unacked().length;
       if (!n) { TMS.panels.toast('미확인 경보 없음'); return; }
-      if (!confirm(TMS.i18n.t(`미확인 경보 ${n}건을 모두 확인 처리함(시안 전용 일괄 소거). 계속할까요?`))) return;
+      if (!confirm(TMS.i18n.t(`미확인 경보 ${n}건을 모두 확인 처리함(데모 전용 일괄 소거). 계속할까요?`))) return;
       TMS.panels.toast(`일괄 소거 완료: 미확인 경보 ${S.ackAll()}건`);
     };
     $('#btn-ack-all').addEventListener('click', ackAll);
@@ -162,7 +162,7 @@
     if (S.view === lastView && closed === lastAssets) return;
     lastView = S.view;
     lastAssets = closed;
-    document.title = TMS.i18n.t(`AAM TMS 관제 · ${TMS.VIEWS[S.view].label} (시안)`);
+    document.title = TMS.i18n.t(`AAM TMS 관제 · ${TMS.VIEWS[S.view].label} (데모)`);
     const pane = $('#pane-map');
     if (pane && pane.offsetParent !== null) TMS.mapView.ensure($('#map'));
   }

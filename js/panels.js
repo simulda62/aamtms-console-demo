@@ -266,7 +266,7 @@
         opChoice = null;
         root.querySelectorAll('[data-act="op"]').forEach(x => x.classList.remove('is-on'));
         q('op-save').disabled = true;
-        toast('병행 운용 판단을 기록함(시안: 화면 메모리에만 저장).');
+        toast('병행 운용 판단을 기록함(데모: 화면 메모리에만 저장).');
       }
     });
   }

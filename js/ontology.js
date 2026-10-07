@@ -465,7 +465,7 @@
   // ---------- 머리 ----------
   function renderHead() {
     document.querySelectorAll('#og-views [data-v]').forEach(b => b.classList.toggle('is-on', b.dataset.v === O.view));
-    $('#og-meta-save').textContent = O.dirty ? '노드 위치 변경 · 저장 안 함' : '편집 시안 · 저장 안 함';
+    $('#og-meta-save').textContent = O.dirty ? '노드 위치 변경 · 저장 안 함' : '데모 편집 · 저장 안 함';
     $('#og-meta-save').classList.toggle('is-dirty', O.dirty);
     document.querySelector('.pane-ograph').dataset.ov = O.view;
   }
@@ -670,7 +670,7 @@
   function exportJson() {
     const doc = {
       name: '비행 온톨로지(가상 예시)', profile: PROFILE, exported_at: new Date().toISOString(),
-      note: 'AAM TMS 관제 화면 시안의 가상 정의임. 개발·운영 정의가 아님.',
+      note: 'AAM TMS 관제 화면 데모의 가상 정의임. 개발·운영 정의가 아님.',
       types: Object.fromEntries(Object.entries(TYPES).map(([k, t]) => [k, t.label])),
       nodes: NODES.map(n => ({ id: n.id, type: n.type, name: n.name, key: n.key, domain: n.domain, unit: n.unit, dtype: n.dtype,
         ...(n.type === 'rule' ? { source_field: n.field, source_unit: n.srcUnit, formula: n.formula } : {}), position: posOf(n.id).map(Math.round) })),
@@ -686,7 +686,7 @@
 
   // ---------- 조작 ----------
   const toast = m => TMS.panels.toast(m);
-  const NO_EDIT = '시안: 정의 추가·편집·연결은 하지 않음. 노드 위치 이동만 이 창 메모리에 남음.';
+  const NO_EDIT = '데모: 정의 추가·편집·연결은 하지 않음. 노드 위치 이동만 이 창 메모리에 남음.';
   function bindCanvas() {
     const cv = $('#og-canvas');
     let drag = null;
@@ -760,7 +760,7 @@
       if (O.view === 'graph') fit();
     }));
     $('#og-export').addEventListener('click', () => { exportJson(); toast('가상 정의를 JSON 파일로 내보냄'); });
-    $('#og-save').addEventListener('click', () => { O.dirty = false; renderHead(); toast('시안: 정의는 저장하지 않음. 노드 위치는 이 창 메모리에만 남음.'); });
+    $('#og-save').addEventListener('click', () => { O.dirty = false; renderHead(); toast('데모: 정의는 저장하지 않음. 노드 위치는 이 창 메모리에만 남음.'); });
     $('#ox-search').addEventListener('input', e => { O.q = e.target.value; render(); });
     $('#ox-collapse').addEventListener('click', () => { document.body.classList.add('assets-closed'); TMS.panels.update(); requestAnimationFrame(() => fit()); });
     $('#ox-body').addEventListener('click', e => {

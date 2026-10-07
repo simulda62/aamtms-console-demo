@@ -3,26 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AAM TMS 관제 (시안)</title>
+<title>AAM TMS 관제 (데모)</title>
 <!-- 지도 라이브러리·웹 글꼴은 vendor/에 함께 둠(오프라인판). 외부 자원은 지도 타일뿐이며, 운영 환경(망 분리)에서는 타일도 내부에 두어야 함. -->
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="css/console.css?v=90d8286">
+<link rel="stylesheet" href="css/console.css?v=f2d0e75">
 </head>
 <body data-view="main">
 
 <!-- 상단 표시줄 -->
 <header class="topbar">
-  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=90d8286" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
+  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=f2d0e75" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
   <nav class="tabs" id="tabs"></nav>
   <div class="top-right">
     <span class="screen-pos" id="screen-pos" hidden></span>
     <button type="button" class="top-btn" id="btn-multi" title="화면 역할을 모니터별로 나누어 엶">멀티모니터</button>
     <button type="button" class="top-btn top-btn--icon" id="btn-fullscreen" title="전체 화면">⛶</button>
-    <button type="button" class="top-btn" id="btn-demo" title="가상 상황 주입">시안 제어</button>
+    <button type="button" class="top-btn" id="btn-demo" title="가상 상황 주입">데모 제어</button>
     <div class="seg seg--sm lang-toggle" id="lang-toggle" title="표시 언어"><button type="button" data-lang="ko">KO</button><button type="button" data-lang="en">EN</button></div>
     <span class="demo-flag"><i></i>DEMO DATA</span>
-    <span class="avatar" title="관제 요원(시안)">OP</span>
+    <span class="avatar" title="관제 요원(데모)">OP</span>
   </div>
 </header>
 
@@ -59,7 +59,7 @@
   <span class="chip" id="chip-sig" title="수신 메시지 서명 검증">서명 검증<b>—</b></span>
   <span class="chip" title="적용 중인 정책 버전">정책<b class="mono">POL-가상-0.3</b></span>
   <span class="chip" id="chip-peers" title="연동된 화면 창 수">연동 창<b>1개</b></span>
-  <button type="button" class="btn btn--sm btn--bulk" id="btn-ack-all" hidden title="시안 전용(장시간 시연용). 운영 제품에는 없음">미확인 <b id="ack-all-n">0</b>건 일괄 소거</button>
+  <button type="button" class="btn btn--sm btn--bulk" id="btn-ack-all" hidden title="데모 전용(장시간 시연용). 운영 제품에는 없음">미확인 <b id="ack-all-n">0</b>건 일괄 소거</button>
   <span class="clock"><b class="mono" id="clock-kst">--:--:--</b> KST <b class="mono" id="clock-utc">--:--:--</b> UTC</span>
 </div>
 
@@ -219,7 +219,7 @@
         <button type="button" data-v="data">데이터 원천<span class="count" id="og-n-data">0</span></button>
       </nav>
       <div class="og-head__right">
-        <span class="og-meta"><i class="dot dot--live"></i><span id="og-meta-save">편집 시안 · 저장 안 함</span></span>
+        <span class="og-meta"><i class="dot dot--live"></i><span id="og-meta-save">데모 편집 · 저장 안 함</span></span>
         <span class="og-meta" id="og-meta-rels">0개 관계</span>
         <button type="button" class="btn" id="og-export" title="가상 정의를 JSON 파일로 내보냄">↗ JSON 내보내기</button>
         <button type="button" class="btn btn--primary" id="og-save">✓ 저장</button>
@@ -340,7 +340,7 @@
 
 <!-- 시안 제어 -->
 <aside class="demo" id="demo-panel" hidden>
-  <div class="demo__head"><span class="eyebrow">시안 제어</span><button type="button" class="icon-btn" id="demo-close" aria-label="닫기">✕</button></div>
+  <div class="demo__head"><span class="eyebrow">데모 제어</span><button type="button" class="icon-btn" id="demo-close" aria-label="닫기">✕</button></div>
   <p class="hint">가상 상황 주입. 실시간에서만 동작하며 모든 연동 창에 적용됨.</p>
   <label class="demo__row"><input type="checkbox" id="demo-feed"> 판정 결과 수신 중단</label>
   <div class="demo__row">대상 기체 <select id="demo-ac"></select></div>
@@ -363,7 +363,7 @@
   <div class="demo__row">
     <button type="button" class="btn" id="demo-ack-all">미확인 경보 일괄 소거</button>
   </div>
-  <p class="hint">일괄 소거는 장시간 시연용 시안 기능이며 운영 제품에는 두지 않음.</p>
+  <p class="hint">일괄 소거는 장시간 시연용 데모 기능이며 운영 제품에는 두지 않음.</p>
   <div class="demo__script" id="demo-offline" hidden>
     <b>오프라인 파일</b>
     <p class="hint">압축을 풀고 index.html을 열면 인터넷 없이 작동함(지도 배경은 격자).</p>
@@ -375,13 +375,13 @@
 <div class="closed-overlay">연동 창 종료 요청을 받음. 이 창은 닫아도 됨.</div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="js/config.js?v=90d8286"></script>
-<script src="js/i18n.js?v=90d8286"></script>
-<script src="js/mock_source.js?v=90d8286"></script>
-<script src="js/store.js?v=90d8286"></script>
-<script src="js/map_view.js?v=90d8286"></script>
-<script src="js/panels.js?v=90d8286"></script>
-<script src="js/ontology.js?v=90d8286"></script>
-<script src="js/app.js?v=90d8286"></script>
+<script src="js/config.js?v=f2d0e75"></script>
+<script src="js/i18n.js?v=f2d0e75"></script>
+<script src="js/mock_source.js?v=f2d0e75"></script>
+<script src="js/store.js?v=f2d0e75"></script>
+<script src="js/map_view.js?v=f2d0e75"></script>
+<script src="js/panels.js?v=f2d0e75"></script>
+<script src="js/ontology.js?v=f2d0e75"></script>
+<script src="js/app.js?v=f2d0e75"></script>
 </body>
 </html>
