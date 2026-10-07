@@ -7,13 +7,13 @@
 <!-- 지도 라이브러리·웹 글꼴은 vendor/에 함께 둠(오프라인판). 외부 자원은 지도 타일뿐이며, 운영 환경(망 분리)에서는 타일도 내부에 두어야 함. -->
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="css/console.css?v=add66eb">
+<link rel="stylesheet" href="css/console.css?v=d728ae5">
 </head>
 <body data-view="main">
 
 <!-- 상단 표시줄 -->
 <header class="topbar">
-  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=add66eb" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
+  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=d728ae5" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
   <nav class="tabs" id="tabs"></nav>
   <div class="top-right">
     <span class="screen-pos" id="screen-pos" hidden></span>
@@ -43,6 +43,9 @@
   </button>
   <button type="button" data-rail="map" title="상황 지도">
     <svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13"/><path d="M3.5 8l4.5-4.5M3.5 13l9.5-9.5M6.5 16.5l10-10M11.5 16.5l5-5"/></svg>
+  </button>
+  <button type="button" data-rail="ontology" title="온톨로지">
+    <svg viewBox="0 0 20 20"><rect x="2.5" y="4" width="4.5" height="3.5"/><rect x="2.5" y="12.5" width="4.5" height="3.5"/><path d="M10 7.2L13 10l-3 2.8L7 10z"/><circle cx="15.5" cy="10" r="2"/><path d="M7 5.8h1.5L10 7.2M7 14.2h1.5L10 12.8M13 10h.5"/></svg>
   </button>
 </nav>
 
@@ -201,6 +204,118 @@
     <div class="pane-head"><h2>시스템·버전</h2></div>
     <div class="system-body" id="system"></div>
   </section>
+
+  <!-- 온톨로지(데이터 계보, 가상 정의) -->
+  <section class="pane pane-o pane-ohead" aria-label="온톨로지">
+    <div class="og-head">
+      <div class="sched-title">
+        <div class="eyebrow">가상 온톨로지 · 의미 작업 공간</div>
+        <h2>비행 온톨로지</h2>
+      </div>
+      <nav class="og-tabs" id="og-views">
+        <button type="button" data-v="graph" class="is-on">관계 그래프<span class="count" id="og-n-graph">0</span></button>
+        <button type="button" data-v="objects">온톨로지 객체<span class="count" id="og-n-objects">0</span></button>
+        <button type="button" data-v="data">데이터 원천<span class="count" id="og-n-data">0</span></button>
+      </nav>
+      <div class="og-head__right">
+        <span class="og-meta"><i class="dot dot--live"></i><span id="og-meta-save">편집 시안 · 저장 안 함</span></span>
+        <span class="og-meta" id="og-meta-rels">0개 관계</span>
+        <button type="button" class="btn" id="og-export" title="가상 정의를 JSON 파일로 내보냄">↗ JSON 내보내기</button>
+        <button type="button" class="btn btn--primary" id="og-save">✓ 저장</button>
+      </div>
+    </div>
+  </section>
+  <section class="pane pane-o pane-oexp" aria-label="탐색기">
+    <div class="pane-head">
+      <h2>탐색기 <span class="count" id="ox-count">0</span></h2>
+      <button type="button" class="icon-btn" id="ox-collapse" title="탐색기 닫기">‹</button>
+    </div>
+    <label class="search">
+      <svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.5 12.5l4 4"/></svg>
+      <input type="text" id="ox-search" placeholder="노드 검색..." autocomplete="off">
+      <kbd>/</kbd>
+    </label>
+    <div class="ox-subhead"><span>노드 유형</span></div>
+    <div class="list-body" id="ox-body"></div>
+    <div class="pane-foot">
+      <span><i class="dot dot--live"></i>가상 정의</span>
+      <span class="mono">canonical.v0</span>
+    </div>
+  </section>
+  <section class="pane pane-o pane-ograph" aria-label="관계 그래프" data-ov="graph">
+    <div class="og-toolbar">
+      <div class="seg seg--sm og-icoseg" id="og-tools">
+        <button type="button" data-tool="select" class="is-on" title="선택·노드 이동"><svg viewBox="0 0 16 16"><path d="M4 2.5l8 5.5-3.6.8 2 3.8-1.6.8-2-3.8L4 12z"/></svg></button>
+        <button type="button" data-tool="pan" title="화면 이동"><svg viewBox="0 0 16 16"><path d="M8 2v12M2 8h12M8 2L6.3 3.7M8 2l1.7 1.7M8 14l-1.7-1.7M8 14l1.7-1.7M2 8l1.7-1.7M2 8l1.7 1.7M14 8l-1.7-1.7M14 8l-1.7 1.7"/></svg></button>
+      </div>
+      <button type="button" class="top-btn" disabled title="되돌리기">↶</button>
+      <button type="button" class="top-btn" disabled title="다시 하기">↷</button>
+      <span class="og-sep"></span>
+      <button type="button" class="top-btn" data-noedit>⟶ 연결</button>
+      <button type="button" class="top-btn" id="og-auto">▦ 자동 배치</button>
+      <span class="og-grow"></span>
+      <button type="button" class="top-btn" id="og-validate">◇ 검증</button>
+      <button type="button" class="btn btn--sm" data-noedit>+ 변환 규칙</button>
+      <button type="button" class="btn btn--sm" id="og-focus-param" title="공통 파라미터만 강조">◇ 공통 파라미터</button>
+      <button type="button" class="btn btn--sm" data-noedit>+ 노드</button>
+    </div>
+    <div class="og-filters">
+      <label>도메인 <select id="og-domain" aria-label="도메인"></select></label>
+      <label>원천 <select id="og-source" aria-label="원천"></select></label>
+      <div class="seg seg--sm" id="og-lineage">
+        <button type="button" data-l="selected">선택 계보</button>
+        <button type="button" data-l="full" class="is-on">전체 계보</button>
+      </div>
+      <span class="og-count mono" id="og-count">—</span>
+    </div>
+    <div class="og-canvas" id="og-canvas">
+      <div class="og-world" id="og-world">
+        <svg class="og-edges" id="og-edges"></svg>
+        <div id="og-cols"></div>
+        <div id="og-nodes"></div>
+      </div>
+      <div class="cop-chip og-ui">관계 그래프<span id="og-chip-mode">전체 계보</span></div>
+      <div class="og-zoom og-ui">
+        <div class="ctl-col">
+          <button type="button" class="ctl-btn" id="og-zin" title="확대">+</button>
+          <button type="button" class="ctl-btn" id="og-zout" title="축소">−</button>
+          <button type="button" class="ctl-btn" id="og-fit" title="전체 보기">
+            <svg viewBox="0 0 20 20"><path d="M3.5 7.5v-4h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4"/></svg>
+          </button>
+        </div>
+        <span class="og-zoom__pct mono" id="og-zoom-pct">100%</span>
+      </div>
+      <div class="og-overview og-ui" id="og-overview" title="개요 · 눌러서 이동"><span>개요</span><svg viewBox="0 0 168 96"></svg></div>
+      <div class="map-legend og-ui">
+        <span><i class="og-lg og-lg--adsb"></i>ADS-B</span>
+        <span><i class="og-lg og-lg--tlm"></i>텔레메트리</span>
+        <span><i class="og-lg og-lg--virtual"></i>가상기체 주입</span>
+        <span><i class="og-lg og-lg--edge"></i>관계</span>
+        <span><i class="og-lg og-lg--lit"></i>선택 계보</span>
+      </div>
+    </div>
+    <div class="og-tablewrap" id="og-table"></div>
+    <div class="og-drawer" id="og-drawer">
+      <div class="og-drawer__head">
+        <nav class="og-tabs og-tabs--sm" id="og-dtabs">
+          <button type="button" data-dt="preview" class="is-on">데이터 미리보기</button>
+          <button type="button" data-dt="mapping">파라미터 매핑</button>
+          <button type="button" data-dt="rels">관계</button>
+          <button type="button" data-dt="valid">검증<span class="og-badge" id="og-valid-n" hidden></span></button>
+        </nav>
+        <div class="og-drawer__tools">
+          <label>기준 기체 <select id="og-ac" aria-label="기준 기체"></select></label>
+          <span class="og-mode is-live" id="og-mode">실시간</span>
+          <button type="button" class="icon-btn og-dtoggle" id="og-dtoggle" title="미리보기 접기·펴기"><i></i></button>
+        </div>
+      </div>
+      <div class="og-drawer__sub" id="og-dsub"></div>
+      <div class="og-drawer__body" id="og-dbody"></div>
+    </div>
+  </section>
+  <section class="pane pane-o pane-oprops" aria-label="노드 속성">
+    <div class="detail" id="og-props"></div>
+  </section>
 </main>
 
 <!-- 재생 막대 -->
@@ -254,12 +369,13 @@
 <div class="closed-overlay">연동 창 종료 요청을 받음. 이 창은 닫아도 됨.</div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="js/config.js?v=add66eb"></script>
-<script src="js/i18n.js?v=add66eb"></script>
-<script src="js/mock_source.js?v=add66eb"></script>
-<script src="js/store.js?v=add66eb"></script>
-<script src="js/map_view.js?v=add66eb"></script>
-<script src="js/panels.js?v=add66eb"></script>
-<script src="js/app.js?v=add66eb"></script>
+<script src="js/config.js?v=d728ae5"></script>
+<script src="js/i18n.js?v=d728ae5"></script>
+<script src="js/mock_source.js?v=d728ae5"></script>
+<script src="js/store.js?v=d728ae5"></script>
+<script src="js/map_view.js?v=d728ae5"></script>
+<script src="js/panels.js?v=d728ae5"></script>
+<script src="js/ontology.js?v=d728ae5"></script>
+<script src="js/app.js?v=d728ae5"></script>
 </body>
 </html>

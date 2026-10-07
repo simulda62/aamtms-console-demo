@@ -120,7 +120,11 @@
   function initKeys() {
     document.addEventListener('keydown', e => {
       if (e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === '/') { const s = $('#asset-search'); if (s && s.offsetParent) { s.focus(); e.preventDefault(); } return; }
+      if (e.key === '/') {
+        const s = $('#asset-search');
+        if (s && s.offsetParent) { s.focus(); e.preventDefault(); } else if (TMS.ontology.focusSearch()) e.preventDefault();
+        return;
+      }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         const ids = sortedIds();
         const i = ids.indexOf(S.selected);
@@ -128,7 +132,9 @@
         S.select(ids[n]);
         e.preventDefault();
       } else if (e.key === 'Escape') {
-        if (!$('#modal-multi').hidden) $('#modal-multi').hidden = true; else S.select(null);
+        if (!$('#modal-multi').hidden) $('#modal-multi').hidden = true;
+        else if (S.view === 'ontology') TMS.ontology.clear();
+        else S.select(null);
       } else if (e.key === 'f' || e.key === 'F') {
         S.setFollow(!S.follow);
       } else if (e.key === ' ') {
@@ -160,7 +166,7 @@
       b.addEventListener('click', () => { if (b.dataset.lang !== TMS.i18n.lang) TMS.i18n.setLang(b.dataset.lang); });
     });
     TMS.panels.init();
-    S.on(() => { TMS.panels.update(); syncMap(); TMS.mapView.update(); });
+    S.on(() => { TMS.panels.update(); syncMap(); TMS.mapView.update(); TMS.ontology.update(); });
     initMulti();
     initDemo();
     initKeys();

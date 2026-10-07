@@ -154,6 +154,7 @@ TMS.VIEWS = {
   detail:        { label: '기체·판정', tab: true },
   events:        { label: '경보·시스템', tab: true },
   flightplan:    { label: '운항일정', tab: true },
+  ontology:      { label: '온톨로지', tab: true },
   detail_events: { label: '기체·판정·경보', tab: false },
 };
 
