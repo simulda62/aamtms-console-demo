@@ -24,6 +24,8 @@
     '기록 시점의 시스템 판정과 판정 버전을 함께 저장함.': 'Stores the system verdict and versions at the time of logging.',
     '모니터 배치 정보 없음: 창을 연 뒤 각 모니터로 옮기고': 'No monitor layout info: after opening, move each window to its monitor and press',
     '모니터 정보 접근이 허용되지 않음. 수동 배치로 진행함.': 'Monitor access was not granted. Continuing with manual placement.',
+    '인터넷 연결 없음: 지도 배경을 격자로 표시함. 연결되면 위성 배경으로 돌아감.': 'No internet: showing the grid basemap. Satellite returns when the connection is back.',
+    '인터넷 연결 끊김: 지도 배경을 격자로 바꿈. 연결되면 원래 배경으로 돌아감.': 'Internet lost: switched to the grid basemap. The previous basemap returns when the connection is back.',
     '지도 타일을 불러오지 못함. 외부 연결이 없으면 배경을': 'Map tiles failed to load. Without internet, switch the basemap to',
     '가상 예시 절차 · 좌표 임의값': 'Virtual example procedures · arbitrary coordinates',
     '경로별 수신 기체 비율 · A: ADS-B · T: 텔레메트리 · L: LoRa · M: MANET(링크 사용 기체 기준)': 'Share of aircraft received per path · A: ADS-B · T: Telemetry · L: LoRa · M: MANET (of aircraft using the link)',

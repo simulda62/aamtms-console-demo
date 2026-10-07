@@ -168,5 +168,16 @@
       if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {});
     });
     S.init();
+    registerOffline();
   });
+
+  // 오프라인 보관: 한 번 열면 그다음부터 인터넷 없이도 열리게 함(sw.js). 파일로 직접 연 경우(file://)는 쓰지 않음
+  function registerOffline() {
+    if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+    navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(reg => {
+      // 서비스 워커가 관여하기 전에 받은 화면 파일도 보관하도록 목록을 넘김
+      const urls = performance.getEntriesByType('resource').map(e => e.name).filter(u => u.startsWith(location.origin));
+      if (reg.active) reg.active.postMessage({ type: 'precache', page: location.href, urls: [location.href, ...urls] });
+    }).catch(() => {});
+  }
 })();

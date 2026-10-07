@@ -27,9 +27,13 @@
   let tileErrors = 0;
 
 
+  // 인터넷 연결이 없으면 외부 지도 타일 대신 격자 배경을 쓰고, 연결이 돌아오면 고른 배경으로 되돌림
+  let chosen = 'satellite';
+  const offline = () => navigator.onLine === false;
   function setBasemap(key) {
-    basemap = key in BASEMAPS ? key : 'satellite';
-    if (NO_EXTERNAL_TILES) basemap = 'grid';
+    chosen = key in BASEMAPS ? key : 'satellite';
+    basemap = chosen;
+    if (NO_EXTERNAL_TILES || (offline() && BASEMAPS[basemap])) basemap = 'grid';
     if (tile) { map.removeLayer(tile); tile = null; }
     const el = map.getContainer();
     ['satellite', 'dark', 'grid'].forEach(k => el.classList.toggle(`map--${k}`, basemap === k));
@@ -132,6 +136,13 @@
 
     // 배경 지도는 열 때마다 위성으로 시작함(이전 선택을 기억하지 않음)
     setBasemap('satellite');
+    if (offline() && !NO_EXTERNAL_TILES) TMS.panels.toast('인터넷 연결 없음: 지도 배경을 격자로 표시함. 연결되면 위성 배경으로 돌아감.');
+    window.addEventListener('offline', () => {
+      if (NO_EXTERNAL_TILES || !BASEMAPS[chosen]) return;
+      setBasemap(chosen);
+      TMS.panels.toast('인터넷 연결 끊김: 지도 배경을 격자로 바꿈. 연결되면 원래 배경으로 돌아감.');
+    });
+    window.addEventListener('online', () => { if (basemap !== chosen) setBasemap(chosen); });
     fitAll();
     syncZoomClass();
     map.on('mousemove', e => {
