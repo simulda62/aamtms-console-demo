@@ -38,6 +38,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // 외부 자원은 관여하지 않음
+  if (url.pathname.endsWith('.zip')) return; // 내려받기용 압축 파일은 보관하지 않음
   const nav = req.mode === 'navigate';
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);

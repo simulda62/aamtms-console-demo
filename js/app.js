@@ -169,7 +169,15 @@
     });
     S.init();
     registerOffline();
+    showOfflineDownload();
   });
+
+  // 오프라인 파일(.zip) 받기 단추: 공개 사이트처럼 압축 파일이 있을 때만 보임(로컬 서버·파일로 연 경우에는 숨김)
+  function showOfflineDownload() {
+    const box = $('#demo-offline');
+    if (!box || !/^https?:$/.test(location.protocol)) return;
+    fetch('aamtms-console-offline.zip', { method: 'HEAD', cache: 'no-store' }).then(r => { box.hidden = !r.ok; }).catch(() => {});
+  }
 
   // 오프라인 보관: 한 번 열면 그다음부터 인터넷 없이도 열리게 함(sw.js). 파일로 직접 연 경우(file://)는 쓰지 않음
   function registerOffline() {

@@ -7,13 +7,13 @@
 <!-- 지도 라이브러리·웹 글꼴은 vendor/에 함께 둠(오프라인판). 외부 자원은 지도 타일뿐이며, 운영 환경(망 분리)에서는 타일도 내부에 두어야 함. -->
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="css/console.css?v=f07473a">
+<link rel="stylesheet" href="css/console.css?v=3ae60ce">
 </head>
 <body data-view="main">
 
 <!-- 상단 표시줄 -->
 <header class="topbar">
-  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=f07473a" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
+  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=3ae60ce" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
   <nav class="tabs" id="tabs"></nav>
   <div class="top-right">
     <span class="screen-pos" id="screen-pos" hidden></span>
@@ -235,6 +235,7 @@
     <b>무작위 발생 상황 (모든 화면에서 같은 시각에 같게 발생)</b>
     <ul>
       <li>텔레메트리 두절 · 주의</li>
+      <li>텔레메트리 링크 하나 두절 · 주의(이중화 상실)</li>
       <li>속도 초과 · 주의</li>
       <li>경로 이탈 · 주의→경고</li>
       <li>ADS-B 위치 불일치 · 경고</li>
@@ -242,18 +243,23 @@
       <li>강하율 · 경고→비상 (드묾)</li>
     </ul>
   </div>
+  <div class="demo__script" id="demo-offline" hidden>
+    <b>오프라인 파일</b>
+    <p class="hint">압축을 풀고 index.html을 열면 인터넷 없이 작동함(지도 배경은 격자).</p>
+    <a class="btn" href="aamtms-console-offline.zip" download>오프라인 파일 받기 (.zip)</a>
+  </div>
 </aside>
 
 <div class="toast" id="toast" hidden></div>
 <div class="closed-overlay">연동 창 종료 요청을 받음. 이 창은 닫아도 됨.</div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="js/config.js?v=f07473a"></script>
-<script src="js/i18n.js?v=f07473a"></script>
-<script src="js/mock_source.js?v=f07473a"></script>
-<script src="js/store.js?v=f07473a"></script>
-<script src="js/map_view.js?v=f07473a"></script>
-<script src="js/panels.js?v=f07473a"></script>
-<script src="js/app.js?v=f07473a"></script>
+<script src="js/config.js?v=3ae60ce"></script>
+<script src="js/i18n.js?v=3ae60ce"></script>
+<script src="js/mock_source.js?v=3ae60ce"></script>
+<script src="js/store.js?v=3ae60ce"></script>
+<script src="js/map_view.js?v=3ae60ce"></script>
+<script src="js/panels.js?v=3ae60ce"></script>
+<script src="js/app.js?v=3ae60ce"></script>
 </body>
 </html>
