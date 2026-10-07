@@ -359,6 +359,7 @@
   // [종류, 비중, 최소 지속(초), 최대 지속(초)]
   const KINDS = [
     ['tlm_loss', 3, 15, 25],
+    ['link_loss', 2.5, 20, 40], // 텔레메트리 링크 하나 두절(이중 구성은 남은 링크로 수신 유지)
     ['speed', 3, 20, 30],
     ['lateral', 2, 30, 40],
     ['adsb_mismatch', 1.5, 15, 25],
@@ -386,7 +387,7 @@
     const a = Math.floor(rnd(slot, ai, 4) * (SLOT - dur));
     const u = sec - slot * SLOT - a;
     if (u < 0 || u >= dur) return null;
-    return { kind: kind[0], u, dur, start: (slot * SLOT + a) * 1000 };
+    return { kind: kind[0], u, dur, start: (slot * SLOT + a) * 1000, pick: rnd(slot, ai, 6) };
   }
   const inWin = (w, t) => w && t >= w.from && t < w.to;
 
@@ -416,6 +417,16 @@
   }
 
   const mismatchM = ev => 450 * Math.min(1, ev.u / 2);
+
+  // 텔레메트리 링크 상태: 구성(이중/단일)과 두절된 링크
+  const linksOf = ac => (C.TLM_LINKS && C.TLM_LINKS[ac.id]) || ['LoRa'];
+  function tlmState(ac, ev) {
+    const links = linksOf(ac);
+    let lost = [];
+    if (ev && ev.kind === 'tlm_loss') lost = links.slice();
+    if (ev && ev.kind === 'link_loss') lost = [links[Math.min(links.length - 1, Math.floor(ev.pick * links.length))]];
+    return { links, lost, allLost: lost.length === links.length, dual: links.length > 1 };
+  }
 
   // 판정 항목 (기획서 7장 판정 항목).
   // 규칙 이름은 interfaces/rule_catalog.toml, 요구사항 번호는 docs/requirements.md(가안)를 따름.
@@ -447,7 +458,9 @@
     set('descent', ds, `${k.vs.toFixed(0)} fpm`);
     set('separation', 'normal', nearestM == null ? '—' : `${(nearestM / 1000).toFixed(2)} km`);
     let ls = 'normal', lv = '두 경로 정상';
-    if (ev && ev.kind === 'tlm_loss') { ls = 'caution'; lv = '텔레메트리 두절, ADS-B 단독 감시'; }
+    const ts = tlmState(ac, ev);
+    if (ts.allLost) { ls = 'caution'; lv = '텔레메트리 두절, ADS-B 단독 감시'; }
+    else if (ts.lost.length) { ls = 'caution'; lv = `${ts.lost[0]} 두절, ${ts.links.find(l => !ts.lost.includes(l))} 단독(이중화 상실)`; }
     if (ev && ev.kind === 'adsb_mismatch') { ls = 'warning'; lv = `경로 간 위치 차 ${mismatchM(ev).toFixed(0)} m`; }
     set('link', ls, lv);
     set('schedule', 'na', '대응표 미입력');
@@ -477,14 +490,20 @@
     const ev = k.ev;
 
     // 두 입력 경로 (텔레메트리 0.2초, ADS-B 0.5초 갱신 가정)
+    // 텔레메트리: 링크별 수신 상태. 모든 링크가 끊기면 텔레메트리 두절(마지막 수신 위치 유지)
+    const ts = tlmState(ac, ev);
     let tlm;
-    if (ev && ev.kind === 'tlm_loss') {
+    if (ts.allLost) {
       const kl = kin(ac, ev.start);
       const ll = toLL(kl.e, kl.n);
       tlm = { state: 'lost', t_last: ev.start, lat: ll[0], lon: ll[1], alt_ft: kl.alt };
     } else {
       tlm = { state: 'ok', t_last: t, lat, lon, alt_ft: k.alt };
     }
+    tlm.config = ts.dual ? 'dual' : 'single';
+    tlm.links = ts.links.map(name => (ts.lost.includes(name)
+      ? { name, state: 'lost', t_last: ev.start }
+      : { name, state: 'ok', t_last: t }));
     const ta = Math.floor(t / 500) * 500;
     const ka = kin(ac, ta);
     let ae = ka.e, an = ka.n;
@@ -518,7 +537,7 @@
     if (ov && ov.feedDown) return { ok: false, t };
     return {
       ok: true, t,
-      receivers: { adsb: 'ok', lora: 'ok' },
+      receivers: { adsb: 'ok', lora: 'ok', manet: 'ok' },
       records: AIRCRAFT.map(ac => {
         const s = lossStart(ac.id, t, ov);
         if (s == null) return buildRecord(ac, t, ov);

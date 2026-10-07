@@ -63,6 +63,7 @@
     setChip('chip-feed', bad ? 'bad' : 'ok', bad ? '두절' : '정상');
     setChip('chip-adsb', bad ? 'nodata' : rx.adsb === 'ok' ? 'ok' : 'bad', bad ? '정보 없음' : rx.adsb === 'ok' ? '정상' : '이상');
     setChip('chip-lora', bad ? 'nodata' : rx.lora === 'ok' ? 'ok' : 'bad', bad ? '정보 없음' : rx.lora === 'ok' ? '정상' : '이상');
+    setChip('chip-manet', bad ? 'nodata' : rx.manet === 'ok' ? 'ok' : 'bad', bad ? '정보 없음' : rx.manet === 'ok' ? '정상' : '이상');
     setChip('chip-sig', sig ? 'warn' : 'ok', sig ? '실패 발생' : '정상');
     setChip('chip-peers', 'info', `${Object.keys(S.peers).length + 1}개`);
 
@@ -193,8 +194,10 @@
       row.querySelector('.n-gs').textContent = fresh ? `${Math.round(r.fused.gs_kt)} kt` : '—';
       row.querySelector('.n-vs').textContent = fresh ? `${Math.round(r.fused.vs_fpm)} fpm` : '—';
       row.querySelector('.asset__paths').innerHTML = fresh
-        ? ['adsb', 'tlm'].map(k => `<span class="path path--${r.paths[k].state}" title="${k === 'adsb' ? 'ADS-B' : '텔레메트리'}">${k === 'adsb' ? 'A' : 'T'}</span>`).join('') + (r.fusion.flag === 'mismatch' ? '<span class="path path--mismatch" title="경로 간 불일치">≠</span>' : '')
-        : '<span class="path path--nodata">A</span><span class="path path--nodata">T</span>';
+        ? `<span class="path path--${r.paths.adsb.state}" title="ADS-B">A</span>`
+          + (r.paths.tlm.links || []).map(l => `<span class="path path--${l.state}" title="텔레메트리 ${l.name}">${l.name[0]}</span>`).join('')
+          + (r.fusion.flag === 'mismatch' ? '<span class="path path--mismatch" title="경로 간 불일치">≠</span>' : '')
+        : '<span class="path path--nodata">A</span>' + (r ? (r.paths.tlm.links || []).map(l => `<span class="path path--nodata">${l.name[0]}</span>`).join('') : '');
       const hay = `${ac.id} ${ac.type} ${r ? r.proc.label : ''} ${ac.virtual ? '가상' : '실기체'}`.toLowerCase();
       row.hidden = (listFilter === 'real' && ac.virtual) || (listFilter === 'virtual' && !ac.virtual) || (!!query && !hay.includes(query));
       if (!row.hidden) shown++;
@@ -326,7 +329,7 @@
         : `마지막 유효 수신 <b class="mono">${kstMs(r.t)}</b> KST · <span class="st-text--nodata">${ago(S.now - r.t)} 경과</span><br>ID <b>${id}</b> · ${byId[id].type}`;
     const pa = r && fresh ? r.paths : null;
     q('pathicon').innerHTML = `<svg viewBox="0 0 20 20" class="halves"><path class="${pa && pa.adsb.state === 'ok' ? 'on' : 'off'}" d="M10 2a8 8 0 0 0 0 16z"/><path class="${pa && pa.tlm.state === 'ok' ? 'on' : 'off'}" d="M10 2a8 8 0 0 1 0 16z"/></svg>
-      <span>ADS-B ${pa ? (pa.adsb.state === 'ok' ? '수신' : '두절') : '—'} · 텔레메트리 ${pa ? (pa.tlm.state === 'ok' ? '수신' : '두절') : '—'}${pa && r.fusion.flag === 'mismatch' ? ' · <b class="st-text--emergency">불일치</b>' : ''}</span>`;
+      <span>ADS-B ${pa ? (pa.adsb.state === 'ok' ? '수신' : '두절') : '—'}${(r ? r.paths.tlm.links || [] : []).map(l => ` · ${l.name} ${pa ? (l.state === 'ok' ? '수신' : '두절') : '—'}`).join('')}${pa && r.fusion.flag === 'mismatch' ? ' · <b class="st-text--emergency">불일치</b>' : ''}</span>`;
 
     const dash = '—';
     q('data').innerHTML = r ? kv([
@@ -336,7 +339,7 @@
       ['진행 방향', fresh ? `${Math.round(r.fused.hdg)}°` : dash],
       ['위치', fresh ? `${r.fused.lat.toFixed(5)}°,<br>${r.fused.lon.toFixed(5)}°` : dash],
       ['마지막 수신', fresh ? ago(S.now - r.t) : `<span class="st-text--nodata">${ago(S.now - r.t)} 경과</span>`],
-      ['데이터 출처', r.virtual ? '가상 주입' : 'ADS-B · 텔레메트리'],
+      ['데이터 출처', r.virtual ? '가상 주입' : `ADS-B · 텔레메트리(${(r.paths.tlm.links || []).map(l => l.name).join('+')})`],
       ['절차·구간', fresh ? r.proc.label : dash],
     ]) : '<p class="muted">수신 이력 없음</p>';
 
@@ -356,7 +359,9 @@
       else if (r.fusion.flag === 'single') fus = '<span class="st-text--warning">단일 경로 감시</span> · 텔레메트리 두절, ADS-B로 감시 지속';
       else fus = `<span class="st-text--emergency">불일치</span> · 경로 간 차 ${r.fusion.diff_m.toFixed(0)} m · 데이터 이상`;
       q('paths').innerHTML = `<table class="tbl"><thead><tr><th>경로</th><th>상태</th><th>마지막 수신</th><th class="r">경과</th><th>위치·고도</th></tr></thead>
-        <tbody>${row('ADS-B', '저신뢰', r.paths.adsb)}${row('텔레메트리', 'LoRa 전용 링크', r.paths.tlm)}</tbody></table>
+        <tbody>${row('ADS-B', '저신뢰', r.paths.adsb)}${(r.paths.tlm.links || []).map(l => row(`텔레메트리 ${l.name}`, l.name === 'LoRa' ? 'LoRa 전용 링크' : 'MANET(이동 애드혹 망)',
+          { ...l, lat: r.paths.tlm.lat, lon: r.paths.tlm.lon, alt_ft: r.paths.tlm.alt_ft })).join('')}</tbody></table>
+        <p class="fusion">텔레메트리 구성 · ${r.paths.tlm.config === 'dual' ? `이중(${r.paths.tlm.links.map(l => l.name).join('+')})` : `단일(${r.paths.tlm.links[0].name})`}${r.paths.tlm.config === 'dual' && fresh && r.paths.tlm.links.some(l => l.state !== 'ok') && r.paths.tlm.state === 'ok' ? ' · <span class="st-text--warning">이중화 상실</span>' : ''}</p>
         <p class="fusion">위치 융합 · ${fus}</p>${r.virtual ? '<p class="hint">가상기체는 무선 구간을 거치지 않고 입력단에 같은 형식으로 주입됨.</p>' : ''}`;
     } else q('paths').innerHTML = '<p class="muted">수신 이력 없음</p>';
 
@@ -442,7 +447,7 @@
       card('데이터 연결', [
         ['판정 결과 수신', bad ? '<span class="st-text--emergency">두절</span>' : '<span class="st-text--normal">정상</span>'],
         ['마지막 수신', `<span class="mono">${kstMs(S.feed.lastOk)}</span>`],
-        ['ADS-B 수신기', okTxt(rx.adsb)], ['LoRa 수신기', okTxt(rx.lora)],
+        ['ADS-B 수신기', okTxt(rx.adsb)], ['LoRa 수신기', okTxt(rx.lora)], ['MANET 노드', okTxt(rx.manet)],
         ['서명 검증 통과', `${S.sigCount.ok.toLocaleString()}건`],
         ['서명 검증 실패', `${S.sigCount.fail}건${S.sigCount.lastFail ? ` (${kst(S.sigCount.lastFail)})` : ''}`],
       ])
