@@ -3,6 +3,7 @@
 // - 연결되어 있으면 항상 새 파일을 받고(네트워크 우선) 받은 것을 보관함. 연결이 없으면 보관본을 씀.
 // - 한 번 열면 그다음부터는 인터넷 없이도 열리고 작동함.
 const CACHE = 'aamtms-console-demo-v1';
+// 서비스 워커 갱신 표시(내용을 바꾸면 브라우저가 새 서비스 워커를 설치함): 2026-10-08 화면 재확인
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -43,7 +44,8 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const res = await fetch(req);
+      // 화면(index.html)은 브라우저 HTTP 캐시(Pages 10분)를 거치지 않고 서버에 확인해 갱신 직후에도 새 화면이 열리게 함
+      const res = await fetch(nav ? new Request(req, { cache: 'no-cache' }) : req);
       // 화면(index.html)은 주소 뒤 조건(?view= 등)과 상관없이 하나로 보관함
       if (res.ok) await cache.put(nav ? self.registration.scope : req, res.clone());
       return res;
