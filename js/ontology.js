@@ -180,7 +180,8 @@
     tool: 'select', view: 'graph', dtab: 'preview', drawer: true, ac: null,
     pos: {}, auto: {}, k: 1, tx: 0, ty: 0, closed: {}, secClosed: {}, dirty: false,
   };
-  const NW = 176, NH = 48, COLW = 236, PADX = 24, TOP = 48;
+  // 노드 상자 크기: 영어 표시에서 가장 긴 이름(가상 주입 · 수직속도)과 3줄(이름·식별자·상태)이 잘리지 않는 크기
+  const NW = 236, NH = 60, COLW = 292, PADX = 24, TOP = 48;
   const posOf = id => O.pos[id] || O.auto[id];
 
   // 보이는 노드만으로 배치함(필터·선택 계보에서도 빈자리 없이 모음). 사용자가 옮긴 위치(O.pos)가 우선함
@@ -296,7 +297,7 @@
   const glyph = (type, cls = 'og-gl') => `<svg class="${cls}" viewBox="0 0 16 16">${TYPES[type].ico}</svg>`;
   function buildGraph() {
     $('#og-cols').innerHTML = Object.values(TYPES).map(t => `<span class="og-colhead" style="left:${PADX + t.col * COLW}px">${t.label}</span>`).join('');
-    $('#og-nodes').innerHTML = NODES.map(n => `<div class="og-node og-node--${n.type}${n.mark ? ` og-node--${n.mark}` : ''}" data-id="${n.id}">
+    $('#og-nodes').innerHTML = NODES.map(n => `<div class="og-node og-node--${n.type}${n.mark ? ` og-node--${n.mark}` : ''}" data-id="${n.id}" title="${esc(n.name)}">
       <div class="og-node__l1">${glyph(n.type)}<b>${esc(n.name)}</b></div>
       <div class="og-node__l2">${esc(n.sub)}</div>
       <div class="og-node__l3" data-st></div>
@@ -352,6 +353,7 @@
       O.ty = pad - y0 * O.k;
     }
     O.tx = (w - (x1 - x0) * O.k) / 2 - x0 * O.k;
+    O.fitted = true;
     applyView();
   }
   function centerOn(id) {
@@ -794,8 +796,9 @@
     buildGraph();
     bind();
     O.built = true;
-    render();
-    requestAnimationFrame(() => fit());
+    render({ fit: true });
+    // 처음 그릴 때 영역 크기를 아직 모르면 다음 화면 갱신 때 맞춤(그사이 사용자가 고른 위치는 덮지 않음)
+    if (!O.fitted) requestAnimationFrame(() => { if (!O.fitted) fit(); });
   }
 
   // 화면 역할이 온톨로지일 때만 처음 만들고 갱신함

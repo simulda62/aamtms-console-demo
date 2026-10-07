@@ -90,7 +90,7 @@
     '경보 확인과 병행 운용 기록의 주체.': 'Acknowledges alerts and records parallel-ops entries.',
     '원천 필드 · 변환식(가상 예시)': 'Source field · formula (virtual example)',
     'LoRa 링크로 받는 기체 텔레메트리.': 'Aircraft telemetry received over the LoRa link.',
-    '내부 주입(무선 구간 없음)': 'Internal injection (no radio link)',
+    '내부 주입(무선 구간 없음)': 'Internal (no radio link)',
     '운항 배정 하나에 해당하는 비행.': 'A flight for one flight assignment.',
     '선택 계보 · 노드를 고를 것': 'Selected lineage · pick a node',
     '가상 정의를 JSON 파일로 내보냄': 'Export the virtual definitions as JSON',
