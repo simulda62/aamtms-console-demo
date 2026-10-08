@@ -606,6 +606,21 @@
     return { ...base(t), state: 'OK', age_s: Math.floor((t / 1000) % R) };
   }
 
+  // 정기 백업 모사: 매일 같은 시각 실행, 날짜별 결정적 난수로 가끔 실패. 성공 이력이 7일 안에 없으면 성공 없음
+  function backupAt(t) {
+    const D = 86400000, H = C.BACKUP_HOUR_UTC * 3600000;
+    const day = Math.floor((t - H) / D);
+    const okOn = d => rnd(d, 98, 1) >= C.BACKUP_FAIL_PROB;
+    const runAt = d => d * D + H;
+    const setName = ms => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+    let succ = null;
+    for (let d = day; d > day - 7; d--) if (okOn(d)) { succ = runAt(d); break; }
+    const lastOk = okOn(day);
+    const age = succ == null ? null : Math.floor((t - succ) / 1000);
+    const att = !lastOk || succ == null || age > C.BACKUP_MAX_AGE_H * 3600;
+    return { state: att ? 'ATTENTION' : 'OK', last_run_ok: lastOk, age_s: age, set: succ == null ? null : setName(succ) };
+  }
+
   function sample(t, ov) {
     if (ov && ov.feedDown) return { ok: false, t };
     return {
@@ -613,6 +628,8 @@
       receivers: { adsb: 'ok', lora: 'ok', manet: 'ok' },
       // 서버 시각 동기 요약(가상 값). 조회 API 실시간 상태 JSON 최상위 clock(interfaces/api_format.md 0.2, REQ-API-007)과 같은 칸
       clock: clockAt(t, ov),
+      // 정기 백업 요약(가상 값). 칸 이름은 모니터링 현재 상태 JSON의 backup과 같게 둔 가안이며, 조회 API 제공 방식은 백엔드 결정 대기(2026-10-09)
+      backup: backupAt(t),
       records: AIRCRAFT.map(ac => {
         const s = lossStart(ac.id, t, ov);
         if (s == null) return buildRecord(ac, t, ov);

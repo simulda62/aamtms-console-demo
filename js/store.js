@@ -99,6 +99,7 @@
       S.feed.lastOk = t;
       S.receivers = snap.receivers;
       S.timeSync = snap.clock || null;
+      S.backup = snap.backup || null;
       snap.records.forEach(r => {
         const isNew = S.lastSeenT[r.id] !== r.t;
         S.lastSeenT[r.id] = r.t;

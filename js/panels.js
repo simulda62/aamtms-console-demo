@@ -84,6 +84,16 @@
     const [ckCls, ckLabel] = ck && CK[ck.state] ? CK[ck.state] : ['nodata', '정보 없음'];
     const fmtMs = v => { if (v == null) return '—'; const x = Math.round(Number(v) * 10) / 10 || 0; return `${x > 0 ? '+' : ''}${x.toFixed(1)} ms`; };
     setChip('chip-clock', ckCls, !ck ? ckLabel : ck.state === 'OK' || ck.state === 'ATTENTION' ? `${ckLabel} ${fmtMs(ck.offset_ms)}` : ck.state === 'NO_REPORT' && ck.age_s != null ? `${ckLabel} ${ck.age_s}초` : ckLabel);
+    // 서버 정기 백업: 평소(정상)에는 칩을 숨기고 주의·보고 없음·정보 없음일 때만 보임
+    const bk = bad ? null : S.backup;
+    const bkState = bk ? bk.state : 'NO_INFO';
+    const bkEl = $('#chip-backup');
+    bkEl.hidden = bkState === 'OK';
+    if (bkState !== 'OK') {
+      const why = !bk ? '' : bk.state !== 'ATTENTION' ? '' : bk.last_run_ok === false ? ' · 실행 실패' : bk.set == null ? ' · 성공 없음' : ' · 오래됨';
+      setChip('chip-backup', bkState === 'NO_INFO' ? 'nodata' : 'warn', `${({ ATTENTION: '주의', NO_REPORT: '보고 없음', NO_INFO: '정보 없음' })[bkState] || '정보 없음'}${why}`);
+      bkEl.title = TMS.i18n.t(bk ? `서버 정기 백업 · 마지막 실행 ${bk.last_run_ok == null ? '—' : bk.last_run_ok ? '성공' : '실패'} · 마지막 성공 후 ${F.dur(bk.age_s)} · 백업 묶음 ${bk.set || '—'}` : '서버 정기 백업 · 정보 없음');
+    }
     $('#chip-clock').title = TMS.i18n.t(ck ? `서버 시각 동기 · ${ck.synced ? '동기됨' : '동기 안 됨'} · 계층 ${ck.stratum ?? '—'} · 시각 오차 ${fmtMs(ck.offset_ms)} · 최대 오차 추정 ${ck.error_ms == null ? '—' : `${Number(ck.error_ms).toFixed(1)} ms`} · 기준 원천 ${ck.ref || '—'} · 보고 나이 ${ck.age_s == null ? '—' : `${ck.age_s}초 전`}` : '서버 시각 동기 · 정보 없음');
 
     const cs = $('#conn-state');
@@ -483,6 +493,16 @@
           ['보고 나이', ck && ck.age_s != null ? `${ck.age_s}초 전` : '—'],
         ];
       })(), '<p class="hint">핵심 운영 서버의 시각 동기 상태(판단은 상태 수집 에이전트). 교통 판정에는 반영하지 않음.</p>')
+      + card('정기 백업', (() => {
+        const bk = bad ? null : S.backup;
+        const BK = { OK: '<span class="st-text--normal">정상</span>', ATTENTION: '<span class="st-text--caution">주의</span>', NO_REPORT: '<span class="st-text--caution">보고 없음</span>', NO_INFO: '<span class="muted">정보 없음</span>' };
+        return [
+          ['상태', bk ? BK[bk.state] || BK.NO_INFO : BK.NO_INFO],
+          ['마지막 실행', !bk || bk.last_run_ok == null ? '—' : bk.last_run_ok ? '성공' : '<span class="st-text--caution">실패</span>'],
+          ['마지막 성공 후', bk && bk.age_s != null ? F.dur(bk.age_s) : '—'],
+          ['백업 묶음', bk && bk.set ? `<span class="mono">${F.esc(bk.set)}</span>` : '—'],
+        ];
+      })(), '<p class="hint">핵심 운영 서버의 정기 백업(백업 → 대조 → 보관 정리) 결과. 판단은 상태 수집 에이전트. 교통 판정과 무관함.</p>')
       + card('연동 화면', [
         ['이 창', `${TMS.VIEWS[S.view].label}${S.screenNo ? ` · 화면 ${S.screenNo}/${S.screenCount}` : ''}`],
         ...peers.map(([, p]) => ['연동 창', `${p.view && TMS.VIEWS[p.view] ? TMS.VIEWS[p.view].label : '확인 중'}${p.screenNo ? ` · 화면 ${p.screenNo}` : ''} · ${F.age(Date.now() - p.seen)} 응답`]),

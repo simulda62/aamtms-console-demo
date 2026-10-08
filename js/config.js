@@ -23,6 +23,11 @@ TMS.config = {
   CLOCK_REPORT_SEC: 16,
   CLOCK_SLOT_SEC: 600,
   CLOCK_EVENT_PROB: 0.12,
+  // 정기 백업 모사(가상 값). 매일 BACKUP_HOUR_UTC시(UTC)에 실행, 하루 BACKUP_FAIL_PROB 확률로 실패.
+  // 마지막 실행 실패·성공 없음·마지막 성공이 BACKUP_MAX_AGE_H시간보다 오래되면 주의(운영에서는 에이전트 설정 max_age_h로 판단)
+  BACKUP_HOUR_UTC: 17,
+  BACKUP_FAIL_PROB: 0.1,
+  BACKUP_MAX_AGE_H: 26,
   // 텔레메트리 링크 구성(가상 예시): 기체마다 이중(LoRa+MANET) 또는 단일(LoRa만 / MANET만)로 운용
   // 링크 이름은 조회 API·운항계획의 링크 이름(LORA, MANET)을 따름(interfaces/api_format.md, flight_plan_format.md)
   TLM_LINKS: { R01: ['LORA', 'MANET'], V01: ['LORA', 'MANET'], V02: ['MANET'], V03: ['LORA'], V04: ['LORA', 'MANET'], V05: ['MANET'], V06: ['LORA'], R02: ['LORA', 'MANET'] },
@@ -201,6 +206,12 @@ TMS.fmt = {
     if (ms < 0) ms = 0;
     if (ms < 60000) return `${(ms / 1000).toFixed(1)}초 전`;
     return `${Math.floor(ms / 60000)}분 ${Math.floor((ms % 60000) / 1000)}초 전`;
+  },
+  // 경과 시간(초)을 '1일 5시간', '5시간 12분', '12분'으로 표시. null이면 '—'
+  dur(s) {
+    if (s == null) return '—';
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    return d ? `${d}일 ${h}시간` : h ? `${h}시간 ${m}분` : `${m}분`;
   },
   ll(lat, lon) { return `${lat.toFixed(5)}°N ${lon.toFixed(5)}°E`; },
   esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); },
