@@ -628,7 +628,7 @@
       receivers: { adsb: 'ok', lora: 'ok', manet: 'ok' },
       // 서버 시각 동기 요약(가상 값). 조회 API 실시간 상태 JSON 최상위 clock(interfaces/api_format.md 0.2, REQ-API-007)과 같은 칸
       clock: clockAt(t, ov),
-      // 정기 백업 요약(가상 값). 칸 이름은 모니터링 현재 상태 JSON의 backup과 같게 둔 가안이며, 조회 API 제공 방식은 백엔드 결정 대기(2026-10-09)
+      // 정기 백업 요약(가상 값). 조회 API 실시간 상태 JSON 최상위 backup(interfaces/api_format.md 0.3, REQ-API-007)과 같은 칸
       backup: backupAt(t),
       records: AIRCRAFT.map(ac => {
         const s = lossStart(ac.id, t, ov);
