@@ -845,7 +845,7 @@ body.is-closed .closed-overlay { display: grid; place-items: center; position: f
   .mode--live i, .alert--emergency, .mk--emergency .mk__halo, .asset--emergency .asset__dot { animation: none; }
 }
 @media (max-width: 1500px) {
-  .statusline .chip:nth-child(n+6) { display: none; }
+  .statusline .chip:nth-child(n+6):not(.chip--policy) { display: none; }
   body[data-view="main"] .layout { grid-template-columns: 280px minmax(0, 1fr) 360px; }
   .brand__sub, .demo-flag { display: none; }
   .map-legend { display: none; }
