@@ -78,6 +78,13 @@
     setChip('chip-manet', bad ? 'nodata' : rx.manet === 'ok' ? 'ok' : 'bad', bad ? '정보 없음' : rx.manet === 'ok' ? '정상' : '이상');
     setChip('chip-sig', sig ? 'warn' : 'ok', sig ? '실패 발생' : '정상');
     setChip('chip-peers', 'info', `${Object.keys(S.peers).length + 1}개`);
+    // 서버 시각 동기: 판단은 에이전트가 하고 화면은 표시만 함. 판정 결과 수신이 끊기면 정보 없음
+    const ck = bad ? null : S.timeSync;
+    const CK = { OK: ['ok', '정상'], ATTENTION: ['warn', '주의'], NO_REPORT: ['warn', '보고 없음'], NO_INFO: ['nodata', '정보 없음'] };
+    const [ckCls, ckLabel] = ck && CK[ck.state] ? CK[ck.state] : ['nodata', '정보 없음'];
+    const fmtMs = v => { if (v == null) return '—'; const x = Math.round(Number(v) * 10) / 10 || 0; return `${x > 0 ? '+' : ''}${x.toFixed(1)} ms`; };
+    setChip('chip-clock', ckCls, ck && ck.state === 'OK' ? `${ckLabel} ${fmtMs(ck.offset_ms)}` : ckLabel);
+    $('#chip-clock').title = TMS.i18n.t(ck ? `서버 시각 동기 · ${ck.synced ? '동기됨' : '동기 안 됨'} · 계층 ${ck.stratum ?? '—'} · 시각 오차 ${fmtMs(ck.offset_ms)} · 최대 오차 추정 ${ck.error_ms == null ? '—' : `${Number(ck.error_ms).toFixed(1)} ms`} · 기준 원천 ${ck.ref || '—'} · 보고 나이 ${ck.age_s == null ? '—' : `${ck.age_s}초 전`}` : '서버 시각 동기 · 정보 없음');
 
     const cs = $('#conn-state');
     if (cs) {
@@ -462,6 +469,20 @@
         ['서명 검증 통과', `${S.sigCount.ok.toLocaleString()}건`],
         ['서명 검증 실패', `${S.sigCount.fail}건${S.sigCount.lastFail ? ` (${kst(S.sigCount.lastFail)})` : ''}`],
       ])
+      + card('시각 동기', (() => {
+        const ck = bad ? null : S.timeSync;
+        const CK = { OK: '<span class="st-text--normal">정상</span>', ATTENTION: '<span class="st-text--caution">주의</span>', NO_REPORT: '<span class="st-text--caution">보고 없음</span>', NO_INFO: '<span class="muted">정보 없음</span>' };
+        const ms = v => { if (v == null) return '—'; const x = Math.round(Number(v) * 10) / 10 || 0; return `<span class="mono">${x > 0 ? '+' : ''}${x.toFixed(1)} ms</span>`; };
+        return [
+          ['상태', ck ? CK[ck.state] || CK.NO_INFO : CK.NO_INFO],
+          ['동기 여부', ck && ck.synced != null ? (ck.synced ? '동기됨' : '동기 안 됨') : '—'],
+          ['계층(stratum)', ck && ck.stratum != null ? ck.stratum : '—'],
+          ['시각 오차', ms(ck && ck.offset_ms)],
+          ['최대 오차 추정', ck && ck.error_ms != null ? `<span class="mono">${Number(ck.error_ms).toFixed(1)} ms</span>` : '—'],
+          ['기준 원천', ck && ck.ref ? `<span class="mono">${F.esc(ck.ref)}</span>` : '—'],
+          ['보고 나이', ck && ck.age_s != null ? `${ck.age_s}초 전` : '—'],
+        ];
+      })(), '<p class="hint">핵심 운영 서버의 시각 동기 상태(판단은 상태 수집 에이전트). 교통 판정에는 반영하지 않음.</p>')
       + card('연동 화면', [
         ['이 창', `${TMS.VIEWS[S.view].label}${S.screenNo ? ` · 화면 ${S.screenNo}/${S.screenCount}` : ''}`],
         ...peers.map(([, p]) => ['연동 창', `${p.view && TMS.VIEWS[p.view] ? TMS.VIEWS[p.view].label : '확인 중'}${p.screenNo ? ` · 화면 ${p.screenNo}` : ''} · ${F.age(Date.now() - p.seen)} 응답`]),

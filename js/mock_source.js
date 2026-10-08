@@ -579,6 +579,8 @@
     return {
       ok: true, t,
       receivers: { adsb: 'ok', lora: 'ok', manet: 'ok' },
+      // 서버 시각 동기 요약(가상). 칸 이름은 모니터링 현재 상태 JSON의 clock과 같게 둔 가안이며, 조회 API 제공 방식은 백엔드 결정 대기(2026-10-09)
+      clock: { state: 'OK', synced: true, stratum: 1, offset_ms: +(0.4 * Math.sin(t / 47000)).toFixed(2), error_ms: +(0.8 + 0.2 * Math.sin(t / 61000)).toFixed(2), ref: 'GPS0 (가상)', age_s: Math.floor((t / 1000) % 16) },
       records: AIRCRAFT.map(ac => {
         const s = lossStart(ac.id, t, ov);
         if (s == null) return buildRecord(ac, t, ov);
