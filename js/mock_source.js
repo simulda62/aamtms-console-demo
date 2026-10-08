@@ -131,12 +131,18 @@
     VFR_POINTS = Object.entries(V.points).map(([id, p]) => { const q = polar(p.bearing, p.dist); return { id, e: q[0], n: q[1], ll: toLL(q[0], q[1]) }; });
     const pt = id => VFR_POINTS.find(x => x.id === id);
     const unit = (a, b) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
-    // 출항 절차: 버티포트 → 상승 지점(1km, 500ft) → 보고점(출항 고도)
+    // 출항·입항 항로 분리(우측 통행). side +1: 출항 항로(바깥 방향 오른쪽), -1: 입항 항로(바깥 방향 왼쪽)
+    const laneOff = V.laneOffset || 0, gA = V.gateAngle || 0;
+    const lanePt = (id, side) => {
+      const P = pt(id), u = unit(H0, [P.e, P.n]);
+      return [P.e + u[1] * laneOff * side, P.n - u[0] * laneOff * side];
+    };
+    // 출항 절차: 버티포트 → 상승 지점(1km, 보고점 방위 +gateAngle, 500ft) → 보고점 출항 항로(출항 고도)
     const depProcs = {};
     Object.entries(V.departures).forEach(([id, vrp]) => {
-      const P = pt(vrp), u = unit(H0, [P.e, P.n]);
+      const g = polar(V.points[vrp].bearing + gA, V.gateDist), L = lanePt(vrp, 1);
       depProcs[id] = mkProc({ id, ver: '0.1', kind: '출발', vp: NET.hub, gate: vrp,
-        pts: [[H0[0], H0[1], 0], [H0[0] + u[0] * V.gateDist, H0[1] + u[1] * V.gateDist, 500], [P.e, P.n, V.depAlt]] });
+        pts: [[H0[0], H0[1], 0], [g[0], g[1], 500], [L[0], L[1], V.depAlt]] });
       PROCS.push(depProcs[id]);
     });
     // 공중대기점: 대기 경로 안쪽 방향은 버티포트 쪽, 경로는 바깥쪽으로 뻗음
@@ -151,11 +157,11 @@
       hold.pattern = pat;
       return hold;
     });
-    // 입항 절차: 대기점 → 보고점(입항 고도) → 최종 접근점(1km, 300ft) → 착륙
+    // 입항 절차: 대기점 → 보고점 입항 항로(입항 고도) → 최종 접근점(1km, 보고점 방위 -gateAngle, 300ft) → 착륙
     const arrDefs = {};
     Object.entries(V.arrivals).forEach(([id, a]) => {
-      const P = pt(a.vrp), g = unit([P.e, P.n], H0);
-      arrDefs[id] = { hold: HOLDS.find(h => h.id === a.hold), vrp: P, final: [H0[0] - g[0] * V.gateDist, H0[1] - g[1] * V.gateDist] };
+      const L = lanePt(a.vrp, -1);
+      arrDefs[id] = { hold: HOLDS.find(h => h.id === a.hold), vrp: { id: a.vrp, e: L[0], n: L[1] }, final: polar(V.points[a.vrp].bearing - gA, V.gateDist) };
     });
     const arrCache = {};
     const hubArr = (id, alt) => {
@@ -175,16 +181,27 @@
       const L = Math.hypot(X.e - from[0], X.n - from[1]), ux = (X.e - from[0]) / L, uy = (X.n - from[1]) / L;
       const at = d => [from[0] + ux * d, from[1] + uy * d];
       const p = mkProc({ id: `ARR-${x}`, ver: '0.1', kind: '접근', vp: x,
-        pts: [[from[0], from[1], 1500], [...at(L - 2500), 800], [...at(L - 1000), 300], [X.e, X.n, 0]] });
+        // 섬 방향(출항) 순항 고도는 공중대기 고도층보다 위(V.outboundAlt)로 두어, 섬에서 대기점으로 돌아가는 기체(대기 고도 이하)와 교차해도 수직 분리됨
+        pts: [[from[0], from[1], V.depAlt], [...at(1500), V.outboundAlt || 1500], [...at(L - 2500), 800], [...at(L - 1000), 300], [X.e, X.n, 0]] });
       PROCS.push(p);
       return p;
     };
-    const islandDep = (x, to, toAlt) => {
+    // 섬 출발(섬 → 입항 대기점). 같은 노선의 섬 방향 경로(from → 섬)와 나란히 마주 보고 지나가지 않도록,
+    // 중간 경로점을 섬 방향 경로에서 먼 쪽으로 V.islandLaneOffset(m)만큼 옆으로 띄움(수평 분리)
+    const islandDep = (x, to, toAlt, from) => {
       const X = vp[x];
       const L = Math.hypot(to[0] - X.e, to[1] - X.n), ux = (to[0] - X.e) / L, uy = (to[1] - X.n) / L;
       const at = d => [X.e + ux * d, X.n + uy * d];
+      let mid = at(L * 0.5);
+      const off = V.islandLaneOffset || 0;
+      if (off && from) {
+        // 섬 방향 경로(섬→from 방향)에서 멀어지는 쪽의 수직 방향을 고름
+        const fx = from[0] - X.e, fy = from[1] - X.n;
+        const side = (ux * fy - uy * fx) > 0 ? 1 : -1; // from이 진행 방향 왼쪽에 있으면 오른쪽(+1)으로 띄움
+        mid = [mid[0] + uy * off * side, mid[1] - ux * off * side];
+      }
       const p = mkProc({ id: `DEP-${x}`, ver: '0.1', kind: '출발', vp: x,
-        pts: [[X.e, X.n, 0], [...at(1200), 500], [...at(L * 0.5), 1000], [to[0], to[1], toAlt]] });
+        pts: [[X.e, X.n, 0], [...at(1200), 500], [...mid, 1000], [to[0], to[1], toAlt]] });
       PROCS.push(p);
       return p;
     };
@@ -193,7 +210,7 @@
       const dep = depProcs[r.dep];
       const vrp = dep.pts[dep.pts.length - 1];
       const arrHub = hubArr(r.arr, r.holdAlt);
-      return [dep, islandArr(x, vrp), islandDep(x, [arrHub.pts[0][0], arrHub.pts[0][1]], r.holdAlt), arrHub];
+      return [dep, islandArr(x, vrp), islandDep(x, [arrHub.pts[0][0], arrHub.pts[0][1]], r.holdAlt, vrp), arrHub];
     });
     // 운항 주기를 모든 노선에 같게 맞춤(중심 지상 대기 고정, 남는 시간은 섬 지상 대기)
     const hubDwell = C.HUB_TURNAROUND_SEC, islandMin = C.ISLAND_MIN_TURNAROUND_SEC;
@@ -446,7 +463,22 @@
     ['transition', '중단접근·전환 수행', '미등록', '—'],
   ];
 
-  function evalItems(ac, t, k, nearestM) {
+  // 기체 간 간격(REQ-ENG-014 모사): 수직 범위(±SEP_V_FT) 안에 있는 다른 공중 기체와의 최소 수평 거리.
+  // 지상(착륙장)에 있는 기체는 착륙장 이착륙 분리로 다루므로 대상에서 뺌.
+  function sepOf(ac, t, k) {
+    if (k.ground) return null;
+    let best = null;
+    AIRCRAFT.forEach(o => {
+      if (o === ac) return;
+      const ko = kin(o, t);
+      if (ko.ground || Math.abs(ko.alt - k.alt) >= C.SEP_V_FT) return;
+      const h = Math.hypot(ko.e - k.e, ko.n - k.n);
+      if (!best || h < best.h) best = { h, other: o.id, dv: Math.abs(ko.alt - k.alt) };
+    });
+    return best || { h: null };
+  }
+
+  function evalItems(ac, t, k, sep) {
     const ev = k.ev;
     const r = {};
     const set = (key, status, value) => { r[key] = { status, value }; };
@@ -458,7 +490,12 @@
     let ds = 'normal';
     if (ev && ev.kind === 'descent' && !k.ground) ds = ev.u < 4 ? 'warning' : 'emergency';
     set('descent', ds, `${k.vs.toFixed(0)} fpm`);
-    set('separation', 'normal', nearestM == null ? '—' : `${(nearestM / 1000).toFixed(2)} km`);
+    if (!sep) set('separation', 'normal', '지상(대상 아님)');
+    else if (sep.h == null) set('separation', 'normal', `수직 범위 ±${C.SEP_V_FT} ft 안 기체 없음`);
+    else {
+      const ss = sep.h < C.SEP_H_M ? 'warning' : sep.h < C.SEP_H_M * C.SEP_CAUTION_FACTOR ? 'caution' : 'normal';
+      set('separation', ss, `${(sep.h / 1000).toFixed(2)} km · ${sep.other} · 수직 간격 ${Math.round(sep.dv)} ft (최소 ${C.SEP_H_M} m)`);
+    }
     let ls = 'normal', lv = '두 경로 정상';
     const ts = tlmState(ac, ev);
     if (ts.allLost) { ls = 'caution'; lv = '텔레메트리 두절, ADS-B 단독 감시'; }
@@ -484,13 +521,7 @@
   function buildRecord(ac, t, ov) {
     const k = kin(ac, t);
     const [lat, lon] = toLL(k.e, k.n);
-    let nearest = Infinity;
-    AIRCRAFT.forEach(o => {
-      if (o === ac) return;
-      const ko = kin(o, t);
-      nearest = Math.min(nearest, Math.hypot(ko.e - k.e, ko.n - k.n));
-    });
-    const j = evalItems(ac, t, k, nearest);
+    const j = evalItems(ac, t, k, sepOf(ac, t, k));
     const ev = k.ev;
 
     // 입력 경로 (텔레메트리 0.2초, ADS-B 0.5초 갱신 가정)
@@ -564,7 +595,8 @@
     const s = lossStart(id, t, ov);
     if (s != null && TMS.isStale(t - s)) return { status: 'nodata', cause: '수신 두절' };
     const tt = s != null ? s : t;
-    const j = evalItems(ac, tt, kin(ac, tt), null);
+    const kt = kin(ac, tt);
+    const j = evalItems(ac, tt, kt, sepOf(ac, tt, kt));
     return { status: j.status, cause: j.cause };
   }
 

@@ -23,6 +23,11 @@ TMS.config = {
   TLM_CONFIG_UNSET: ['V06'],
   // 버티포트 이착륙 분리: 같은 버티포트에서 착륙·이륙은 한 번에 한 대만 하며, 앞뒤 움직임 사이에 이 간격(초)을 둠
   PAD_SEPARATION_SEC: 30,
+  // 기체 간 분리 기준(가상 예시 값, 2026-10-08 사용자 선택): 수직 범위(±ft) 안에 있는 다른 기체와의 최소 수평 거리(m).
+  // 판정 항목 '기체 간 간격'(horizontal_separation, REQ-ENG-014)에 씀. 기준 미만은 경고, 기준의 SEP_CAUTION_FACTOR배 미만은 주의(데모 모사)
+  SEP_H_M: 500,
+  SEP_V_FT: 300,
+  SEP_CAUTION_FACTOR: 1.5,
   // 노선망 운항 주기(초)와 중심 버티포트 지상 대기(초). 남는 시간은 섬 지상 대기로 씀.
   NETWORK_CYCLE_SEC: 1800,
   HUB_TURNAROUND_SEC: 90,
@@ -85,6 +90,12 @@ TMS.LOCATION_PRESETS = {
           'HOLD-E': { bearing: 90, dist: 3000, turn: 'R', rotate: 90 },
         },
         gateDist: 1000, // 이륙 후 상승 지점·최종 접근점: 버티포트에서 1km
+        // 출항·입항 항로 분리(우측 통행): 보고점 양옆으로 laneOffset(m)씩 띄운 출항 항로(바깥 방향 오른쪽)와 입항 항로(바깥 방향 왼쪽)를 씀.
+        // 상승 지점은 보고점 방위 +gateAngle(도), 최종 접근점은 -gateAngle로 벌려 버티포트 근처에서도 겹치지 않게 함
+        laneOffset: 500,
+        gateAngle: 15,
+        outboundAlt: 2200,      // 섬 방향 순항 고도(ft): 공중대기 최고층(1,800ft)보다 높게 둠(수직 분리)
+        islandLaneOffset: 600, // 섬 출발 경로 중간점을 같은 노선의 섬 방향 경로에서 먼 쪽으로 띄우는 거리(m)
         depAlt: 1200,   // 출항 보고점 통과 고도(ft)
         arrAlt: 800,    // 입항 보고점 통과 고도(ft)
         departures: { 'DEP-JAW-A': 'A', 'DEP-JAW-B': 'B', 'DEP-JAW-C': 'C', 'DEP-JAW-D': 'D' },
