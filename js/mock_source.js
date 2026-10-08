@@ -580,7 +580,8 @@
     const S0 = C.CLOCK_SLOT_SEC * 1000, slot = Math.floor(t / S0);
     if (rnd(slot, 97, 1) >= C.CLOCK_EVENT_PROB) return null;
     const from = slot * S0 + Math.floor(rnd(slot, 97, 2) * (S0 - 160000)), dur = 60000 + Math.floor(rnd(slot, 97, 3) * 90000);
-    return t >= from && t < from + dur ? { kind: rnd(slot, 97, 4) < 0.65 ? 'attention' : 'no_report', from, to: from + dur } : null;
+    const r = rnd(slot, 97, 4);
+    return t >= from && t < from + dur ? { kind: r < 0.65 ? 'attention' : r < 0.85 ? 'no_report' : 'no_file', from, to: from + dur } : null;
   }
   function clockAt(t, ov) {
     const R = C.CLOCK_REPORT_SEC;
@@ -592,6 +593,8 @@
       const off = C.CLOCK_OFFSET_MAX_MS * (1.2 + 0.8 * Math.sin(Math.PI * u));
       return { ...base(t), state: 'ATTENTION', offset_ms: +off.toFixed(2), error_ms: +(off * 1.3).toFixed(2), age_s: Math.floor((t / 1000) % R) };
     }
+    // 상태 파일 없음: 조회 API(interfaces/api_format.md 0.2, clock_json)는 값 칸을 null로 보냄
+    if (ev && ev.kind === 'no_file') return { state: 'NO_REPORT', synced: false, stratum: null, offset_ms: null, error_ms: null, ref: null, age_s: null };
     if (ev && ev.kind === 'no_report') {
       // 상태 파일 갱신이 멈춤: 마지막 값을 유지하고 나이가 늘어 기준(CLOCK_MAX_AGE_S)을 넘으면 보고 없음
       const last = Math.floor(ev.from / (R * 1000)) * R * 1000;
@@ -606,7 +609,7 @@
     return {
       ok: true, t,
       receivers: { adsb: 'ok', lora: 'ok', manet: 'ok' },
-      // 서버 시각 동기 요약(가상). 칸 이름은 모니터링 현재 상태 JSON의 clock과 같게 둔 가안이며, 조회 API 제공 방식은 백엔드 결정 대기(2026-10-09)
+      // 서버 시각 동기 요약(가상 값). 조회 API 실시간 상태 JSON 최상위 clock(interfaces/api_format.md 0.2, REQ-API-007)과 같은 칸
       clock: clockAt(t, ov),
       records: AIRCRAFT.map(ac => {
         const s = lossStart(ac.id, t, ov);
