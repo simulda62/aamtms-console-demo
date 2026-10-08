@@ -286,6 +286,7 @@
     '승봉도': 'Seungbongdo',
     '덕적도': 'Deokjeokdo',
     '영흥도': 'Yeongheungdo',
+    '선갑도': 'Seongapdo',
     '자월도': 'Jawoldo',
     '연동된 화면 창 수': 'Linked windows',
     '서명 검증 실패 10초': 'Signature fail 10 s',
