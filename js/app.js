@@ -121,11 +121,13 @@
     bulkBtns.forEach(b => b.addEventListener('click', ackAll));
     $('#demo-loss').addEventListener('click', () => { S.simLoss(sel.value); TMS.panels.toast(`${sel.value} 수신 두절 10초 모사`); });
     $('#demo-sig').addEventListener('click', () => { S.simSigFail(sel.value); TMS.panels.toast(`${sel.value} 서명 검증 실패 10초 모사`); });
+    $('#demo-clock-att').addEventListener('click', () => { S.simClock('attention'); TMS.panels.toast('시각 동기 주의(오차 초과) 90초 모사'); });
+    $('#demo-clock-norep').addEventListener('click', () => { S.simClock('no_report'); TMS.panels.toast('시각 동기 상태 파일 갱신 멈춤 90초 모사(30초 뒤 보고 없음)'); });
     S.on(() => {
       if (panel.hidden) return;
       $('#demo-feed').checked = !!S.overrides.feedDown;
       const live = S.mode === 'live';
-      ['#demo-feed', '#demo-loss', '#demo-sig'].forEach(s => { $(s).disabled = !live; });
+      ['#demo-feed', '#demo-loss', '#demo-sig', '#demo-clock-att', '#demo-clock-norep'].forEach(s => { $(s).disabled = !live; });
       if (S.selected && document.activeElement !== sel && sel.dataset.last !== S.selected) { sel.value = S.selected; sel.dataset.last = S.selected; }
     });
   }

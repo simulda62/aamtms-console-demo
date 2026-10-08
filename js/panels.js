@@ -83,7 +83,7 @@
     const CK = { OK: ['ok', '정상'], ATTENTION: ['warn', '주의'], NO_REPORT: ['warn', '보고 없음'], NO_INFO: ['nodata', '정보 없음'] };
     const [ckCls, ckLabel] = ck && CK[ck.state] ? CK[ck.state] : ['nodata', '정보 없음'];
     const fmtMs = v => { if (v == null) return '—'; const x = Math.round(Number(v) * 10) / 10 || 0; return `${x > 0 ? '+' : ''}${x.toFixed(1)} ms`; };
-    setChip('chip-clock', ckCls, ck && ck.state === 'OK' ? `${ckLabel} ${fmtMs(ck.offset_ms)}` : ckLabel);
+    setChip('chip-clock', ckCls, !ck ? ckLabel : ck.state === 'OK' || ck.state === 'ATTENTION' ? `${ckLabel} ${fmtMs(ck.offset_ms)}` : ck.state === 'NO_REPORT' && ck.age_s != null ? `${ckLabel} ${ck.age_s}초` : ckLabel);
     $('#chip-clock').title = TMS.i18n.t(ck ? `서버 시각 동기 · ${ck.synced ? '동기됨' : '동기 안 됨'} · 계층 ${ck.stratum ?? '—'} · 시각 오차 ${fmtMs(ck.offset_ms)} · 최대 오차 추정 ${ck.error_ms == null ? '—' : `${Number(ck.error_ms).toFixed(1)} ms`} · 기준 원천 ${ck.ref || '—'} · 보고 나이 ${ck.age_s == null ? '—' : `${ck.age_s}초 전`}` : '서버 시각 동기 · 정보 없음');
 
     const cs = $('#conn-state');

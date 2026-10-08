@@ -15,6 +15,14 @@ TMS.config = {
   // 시연 상황 무작위 발생: 기체마다 SLOT초 단위로 PROB 확률로 이상 상황 1건(확인 필요 경보 시간당 15건 안팎)
   SCENARIO_SLOT_SEC: 60,
   SCENARIO_EVENT_PROB: 0.07,
+  // 서버 시각 동기 모사(가상 값). 운영에서는 상태 수집 에이전트 설정(offset_max_ms, error_max_ms, max_age_s)으로 판단함.
+  // CLOCK_SLOT_SEC마다 CLOCK_EVENT_PROB 확률로 '주의'(오차 초과) 또는 '보고 없음'(상태 파일 갱신 멈춤)이 60~150초 발생함
+  CLOCK_OFFSET_MAX_MS: 10,
+  CLOCK_ERROR_MAX_MS: 20,
+  CLOCK_MAX_AGE_S: 30,
+  CLOCK_REPORT_SEC: 16,
+  CLOCK_SLOT_SEC: 600,
+  CLOCK_EVENT_PROB: 0.12,
   // 텔레메트리 링크 구성(가상 예시): 기체마다 이중(LoRa+MANET) 또는 단일(LoRa만 / MANET만)로 운용
   // 링크 이름은 조회 API·운항계획의 링크 이름(LORA, MANET)을 따름(interfaces/api_format.md, flight_plan_format.md)
   TLM_LINKS: { R01: ['LORA', 'MANET'], V01: ['LORA', 'MANET'], V02: ['MANET'], V03: ['LORA'], V04: ['LORA', 'MANET'], V05: ['MANET'], V06: ['LORA'], R02: ['LORA', 'MANET'] },

@@ -193,6 +193,8 @@
     emit();
   };
   S.simLoss = id => { const now = Date.now(); S.setOverrides({ ...S.overrides, loss: { ...S.overrides.loss, [id]: { from: quant(now), to: quant(now) + 10000 } } }); };
+  // 서버 시각 동기 이상 모사(데모 제어): kind 'attention' | 'no_report', 90초
+  S.simClock = kind => { const now = Date.now(); S.setOverrides({ ...S.overrides, clock: { kind, from: quant(now), to: quant(now) + 90000 } }); };
   S.simSigFail = id => { const now = Date.now(); S.setOverrides({ ...S.overrides, sig: { ...S.overrides.sig, [id]: { from: quant(now), to: quant(now) + 10000 } } }); };
   S.setFeedDown = on => S.setOverrides({ ...S.overrides, feedDown: on });
   S.closeAll = () => send({ type: 'close-all' });

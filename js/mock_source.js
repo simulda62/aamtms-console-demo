@@ -574,13 +574,40 @@
   }
 
   // 최신 판정 결과 조회 (조회 API 모사)
+  // 서버 시각 동기 모사: 평소 정상(오차 1ms 안팎). 무작위(시각 결정적) 또는 데모 제어로 '주의'·'보고 없음' 구간이 생김
+  function clockEvent(t, ov) {
+    if (ov && ov.clock && inWin(ov.clock, t)) return ov.clock;
+    const S0 = C.CLOCK_SLOT_SEC * 1000, slot = Math.floor(t / S0);
+    if (rnd(slot, 97, 1) >= C.CLOCK_EVENT_PROB) return null;
+    const from = slot * S0 + Math.floor(rnd(slot, 97, 2) * (S0 - 160000)), dur = 60000 + Math.floor(rnd(slot, 97, 3) * 90000);
+    return t >= from && t < from + dur ? { kind: rnd(slot, 97, 4) < 0.65 ? 'attention' : 'no_report', from, to: from + dur } : null;
+  }
+  function clockAt(t, ov) {
+    const R = C.CLOCK_REPORT_SEC;
+    const base = tt => ({ synced: true, stratum: 1, offset_ms: +(0.4 * Math.sin(tt / 47000)).toFixed(2), error_ms: +(0.8 + 0.2 * Math.sin(tt / 61000)).toFixed(2), ref: 'GPS0 (가상)' });
+    const ev = clockEvent(t, ov);
+    if (ev && ev.kind === 'attention') {
+      // 시각 오차가 기준을 넘음(서서히 벌어졌다가 기준 안으로 돌아오기 전까지 주의)
+      const u = (t - ev.from) / (ev.to - ev.from);
+      const off = C.CLOCK_OFFSET_MAX_MS * (1.2 + 0.8 * Math.sin(Math.PI * u));
+      return { ...base(t), state: 'ATTENTION', offset_ms: +off.toFixed(2), error_ms: +(off * 1.3).toFixed(2), age_s: Math.floor((t / 1000) % R) };
+    }
+    if (ev && ev.kind === 'no_report') {
+      // 상태 파일 갱신이 멈춤: 마지막 값을 유지하고 나이가 늘어 기준(CLOCK_MAX_AGE_S)을 넘으면 보고 없음
+      const last = Math.floor(ev.from / (R * 1000)) * R * 1000;
+      const age = Math.floor((t - last) / 1000);
+      return { ...base(last), state: age > C.CLOCK_MAX_AGE_S ? 'NO_REPORT' : 'OK', age_s: age };
+    }
+    return { ...base(t), state: 'OK', age_s: Math.floor((t / 1000) % R) };
+  }
+
   function sample(t, ov) {
     if (ov && ov.feedDown) return { ok: false, t };
     return {
       ok: true, t,
       receivers: { adsb: 'ok', lora: 'ok', manet: 'ok' },
       // 서버 시각 동기 요약(가상). 칸 이름은 모니터링 현재 상태 JSON의 clock과 같게 둔 가안이며, 조회 API 제공 방식은 백엔드 결정 대기(2026-10-09)
-      clock: { state: 'OK', synced: true, stratum: 1, offset_ms: +(0.4 * Math.sin(t / 47000)).toFixed(2), error_ms: +(0.8 + 0.2 * Math.sin(t / 61000)).toFixed(2), ref: 'GPS0 (가상)', age_s: Math.floor((t / 1000) % 16) },
+      clock: clockAt(t, ov),
       records: AIRCRAFT.map(ac => {
         const s = lossStart(ac.id, t, ov);
         if (s == null) return buildRecord(ac, t, ov);
