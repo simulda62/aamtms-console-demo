@@ -581,7 +581,7 @@
     if (rnd(slot, 97, 1) >= C.CLOCK_EVENT_PROB) return null;
     const from = slot * S0 + Math.floor(rnd(slot, 97, 2) * (S0 - 160000)), dur = 60000 + Math.floor(rnd(slot, 97, 3) * 90000);
     const r = rnd(slot, 97, 4);
-    return t >= from && t < from + dur ? { kind: r < 0.65 ? 'attention' : r < 0.85 ? 'no_report' : 'no_file', from, to: from + dur } : null;
+    return t >= from && t < from + dur ? { kind: r < 0.65 ? 'attention' : r < 0.85 ? 'no_report' : 'no_file', from, to: from + dur, sign: rnd(slot, 97, 5) < 0.5 ? -1 : 1 } : null;
   }
   function clockAt(t, ov) {
     const R = C.CLOCK_REPORT_SEC;
@@ -590,8 +590,10 @@
     if (ev && ev.kind === 'attention') {
       // 시각 오차가 기준을 넘음(서서히 벌어졌다가 기준 안으로 돌아오기 전까지 주의)
       const u = (t - ev.from) / (ev.to - ev.from);
+      // 오차 방향(빠름 + / 느림 -)은 발생마다 무작위. 데모 제어 주입은 시작 시각으로 번갈아 정함. 최대 오차 추정은 크기라 양수
       const off = C.CLOCK_OFFSET_MAX_MS * (1.2 + 0.8 * Math.sin(Math.PI * u));
-      return { ...base(t), state: 'ATTENTION', offset_ms: +off.toFixed(2), error_ms: +(off * 1.3).toFixed(2), age_s: Math.floor((t / 1000) % R) };
+      const sign = ev.sign || (Math.floor(ev.from / 1000) % 2 ? -1 : 1);
+      return { ...base(t), state: 'ATTENTION', offset_ms: +(sign * off).toFixed(2), error_ms: +(off * 1.3).toFixed(2), age_s: Math.floor((t / 1000) % R) };
     }
     // 상태 파일 없음: 조회 API(interfaces/api_format.md 0.2, clock_json)는 값 칸을 null로 보냄
     if (ev && ev.kind === 'no_file') return { state: 'NO_REPORT', synced: false, stratum: null, offset_ms: null, error_ms: null, ref: null, age_s: null };
