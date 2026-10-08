@@ -17,7 +17,7 @@ TMS.config = {
   SCENARIO_EVENT_PROB: 0.07,
   // 텔레메트리 링크 구성(가상 예시): 기체마다 이중(LoRa+MANET) 또는 단일(LoRa만 / MANET만)로 운용
   // 링크 이름은 조회 API·운항계획의 링크 이름(LORA, MANET)을 따름(interfaces/api_format.md, flight_plan_format.md)
-  TLM_LINKS: { R01: ['LORA', 'MANET'], V01: ['LORA', 'MANET'], V02: ['MANET'], V03: ['LORA'], V04: ['LORA', 'MANET'], V05: ['MANET'], V06: ['LORA'] },
+  TLM_LINKS: { R01: ['LORA', 'MANET'], V01: ['LORA', 'MANET'], V02: ['MANET'], V03: ['LORA'], V04: ['LORA', 'MANET'], V05: ['MANET'], V06: ['LORA'], R02: ['LORA', 'MANET'] },
   TLM_LINK_LABEL: { LORA: 'LoRa', MANET: 'MANET' },
   // 운항 배정에 링크 구성이 지정되지 않은 기체(telemetry_links = []). 텔레메트리는 위 링크로 받으나 이중화 판정은 하지 않음
   TLM_CONFIG_UNSET: ['V06'],
@@ -66,8 +66,9 @@ TMS.LOCATION_PRESETS = {
         { id: 'SBD', name: '승봉도', ll: [37.16684, 126.30597] },
         { id: 'DJD', name: '덕적도', ll: [37.24188, 126.11559] },
         { id: 'YHD', name: '영흥도', ll: [37.25607, 126.45903] },
+        { id: 'SGD', name: '선갑도', ll: [37.09547, 126.07555] }, // 2026-10-08 추가(실증기 2대 운용 시 노선 분산)
       ],
-      destinations: ['DIJ', 'SIJ', 'SBD', 'DJD', 'YHD'],
+      destinations: ['DIJ', 'SIJ', 'SBD', 'DJD', 'YHD', 'SGD'],
       // 자월도 시험장 시계비행(VFR) 국지절차(가상 예시). 위치는 중심 버티포트 기준 방위(도)·거리(m).
       // 보고점은 A(북서, 왼쪽 위)·B(남서, 왼쪽 아래)·C(북동, 오른쪽 위)·D(남동, 오른쪽 아래). 각 섬은 방향이 가까운 보고점으로 출입항하며,
       // 출항은 보고점을 1,200ft, 입항은 800ft로 지나 고도로 분리함. 공중대기점은 서·동 두 곳.
@@ -100,6 +101,7 @@ TMS.LOCATION_PRESETS = {
           DIJ: { dep: 'DEP-JAW-B', arr: 'ARR-JAW-B', holdAlt: 1500 },
           SBD: { dep: 'DEP-JAW-D', arr: 'ARR-JAW-D', holdAlt: 900 },
           YHD: { dep: 'DEP-JAW-C', arr: 'ARR-JAW-C', holdAlt: 1200 },
+          SGD: { dep: 'DEP-JAW-B', arr: 'ARR-JAW-B', holdAlt: 1800 },
         },
       },
     },

@@ -13,8 +13,8 @@
   // 가상 경로는 기준점 남쪽(육지) 위주로 배치함(북쪽 좌표를 뒤집음)
   const toLL = (e, n) => [LAT0 + n / M_LAT, LON0 + e / M_LON];
   const SHIFT = (TMS.LOCATION && TMS.LOCATION.shift) || [0, 0];
-  // 기본 노선은 7대가 이착륙 간격을 지킬 수 있도록 1.15배로 늘려 배치함
-  const GEN_SCALE = 1.15;
+  // 기본 노선은 8대(실증기 2대 + 가상기체 6대)가 이착륙 간격을 지킬 수 있도록 1.3배로 늘려 배치함(7대일 때 1.15배)
+  const GEN_SCALE = 1.3;
   const flip = pt => [pt[0] * GEN_SCALE + SHIFT[0], -pt[1] * GEN_SCALE + SHIFT[1], pt[2]];
 
   const VERSIONS = { policy: 'POL-가상-0.3', ruleset: 'RULESET-가상-0.1' };
@@ -239,8 +239,9 @@
     };
   }
 
-  // 실증기 1대 + 가상기체 6대 (가상). 노선(순환 경로)에 차례로 배정하고 같은 노선 안에서는 간격을 고르게 둠.
-  const IDS = ['R01', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06'];
+  // 실증기 2대 + 가상기체 6대 (가상). 노선(순환 경로)에 차례로 배정하고 같은 노선 안에서는 간격을 고르게 둠.
+  // R02는 기존 배정이 덜 흔들리도록 맨 뒤에 둠(2026-10-08 추가)
+  const IDS = ['R01', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'R02'];
   const perLoop = LOOPS.map(() => []);
   IDS.forEach((id, i) => perLoop[i % LOOPS.length].push(id));
   // 출발 시각(위상) 배정: 버티포트마다 착륙·이륙 움직임이 겹치지 않도록(간격 PAD_SEPARATION_SEC) 차례로 고름.
