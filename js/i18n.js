@@ -538,6 +538,7 @@
     '데모 제어': 'Demo controls',
     '연동 화면': 'LINKED SCREENS',
     '운항 요약': 'FLIGHT SUMMARY',
+    '수신 요약': 'RX SUMMARY',
     '원인 항목': 'Cause',
     '위치 융합': 'Fusion',
     '위치·고도': 'Position / alt',
