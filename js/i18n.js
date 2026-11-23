@@ -156,6 +156,17 @@
     ' · 제어 모드(ABFAP 수신 값)': ' · control mode (ABFAP values)',
     'ABFAP 항적 전송(가상 예시)': 'ABFAP track push (virtual example)',
     '외부 항적 관측': 'External track observation',
+    // 빠진 항적 기다림(제어 모드)
+    '수신기 유지 값 · ABFAP 전송에서 빠져 마지막 값을 유지함(마지막 실제 수신': 'Held by receiver · missing from the ABFAP push, last value kept (last actual reception',
+    '초 전)': 's ago)',
+    '값 출처(수신·유지)': 'Value provenance (received / held)',
+    '값 출처': 'Value source',
+    '수신기 유지': 'Held by receiver',
+    '마지막 실제 수신': 'Last actual reception',
+    '빠진 항적 기다림': 'Missing-track wait',
+    '스냅샷에서 빠지면 3초까지 마지막 값 유지 → 유지': 'missing from snapshot → keep last value up to 3 s → held',
+    '유지(수신기)': 'held (receiver)',
+    'tracks[].held · held_ms(수신기)': 'tracks[].held · held_ms (receiver)',
     // 상세 텔레메트리(제어 모드)
     ' · 평면 필드와 같음': ' · same as flat field',
     'ABFAP 상세 텔레메트리(telemetry)에서 변환한 비행 상태 값. 원천 값이 -998 이하이거나 그룹·필드가 없으면 해당 없음. 표시 전용이며 판정 입력으로 이어지지 않음. 측정 시각은 항적의 ts이고 필드별 시각은 없음.': 'Flight state values converted from ABFAP detailed telemetry. N/A when the source value is -998 or lower or the group/field is missing. Display only; does not feed verdict inputs. Measured time is the track ts; there is no per-field time.',

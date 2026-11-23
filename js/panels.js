@@ -594,7 +594,8 @@
     q('status').innerHTML = `${stText(st)}${ac.replay ? '<span class="d-cause">재생 항적 · 실시간 기체 아님</span>' : ''}`;
     q('meta').innerHTML = !r ? '수신 이력 없음'
       : `${fresh ? '수신기 수신' : '마지막 유효 수신'} <b class="mono">${kstMs(r.t)}</b> KST · ${fresh ? F.age(S.now - r.t) : `<span class="st-text--nodata">${ago(S.now - r.t)} 경과</span>`}<br>기체 키 <b>${F.esc(id)}</b> (${x.keyFrom === 'callsign' ? 'callsign' : 'model'}) · ${ac.type}`;
-    q('pathicon').innerHTML = `${srcTag(ac)}${f && x.udp_connected === false ? ' <span class="st-text--caution">ABSim 텔레메트리 미수신</span>' : ''}`;
+    const heldTxt = x && x.held ? `수신기 유지 값 · ABFAP 전송에서 빠져 마지막 값을 유지함(마지막 실제 수신 ${(x.held_ms / 1000).toFixed(1)}초 전)` : '';
+    q('pathicon').innerHTML = `${srcTag(ac)}${f && x.udp_connected === false ? ' <span class="st-text--caution">ABSim 텔레메트리 미수신</span>' : ''}${f && x.held ? ` <span class="st-text--caution">${heldTxt}</span>` : ''}`;
     const sub = (v, u) => (v == null ? '' : ` <small class="muted">${Math.round(v)} ${u}</small>`);
     q('data').innerHTML = r ? kv([
       ['고도(MSL)', f ? `${fmtM(f.alt_m)}${sub(f.alt_ft, 'ft')}` : dash],
@@ -616,6 +617,7 @@
       ['callsign', esc(x.callsign)], ['model', esc(x.model)], ['gufi_id', `<span class="mono">${esc(x.gufi_id)}</span>`],
       ['udp_connected', x.udp_connected == null ? dash : x.udp_connected ? '연결' : '<span class="st-text--caution">끊김(3초 넘게 미수신)</span>'],
       ['ABFAP 세션', x.session_id == null ? dash : `<span class="mono">${x.session_id}</span>`],
+      ['값 출처', x.held ? `<span class="st-text--caution">수신기 유지</span> <small class="muted">마지막 실제 수신 ${(x.held_ms / 1000).toFixed(1)}초 전</small>` : '<span class="st-text--normal">수신</span>'],
       ['전송 순번(seq)', `<span class="mono">${x.seq}</span>`],
       ['전송 시각(sent_at)', isFinite(sent) ? `<span class="mono">${kstMs(sent)}</span> KST` : dash],
       ['키 검증', '<span class="st-text--normal">수신기 통과</span> <small class="muted">(X-API-Key · 메시지 서명 없음)</small>'],

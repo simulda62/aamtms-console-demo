@@ -58,9 +58,10 @@
     { id: 'aircraft_key', key: 'key', name: '기체 키', unit: '—', dtype: 'string', domain: 'ops' },
     { id: 'track_source', key: 'src', name: '항적 출처', unit: '—', dtype: 'enum', domain: 'ops' },
     { id: 'info_state', key: 'info', name: '수신 상태(정보 없음)', unit: '—', dtype: 'enum', domain: 'comm' },
+    { id: 'value_provenance', key: 'prov', name: '값 출처(수신·유지)', unit: '—', dtype: 'enum', domain: 'comm' },
   ];
   const parByKey = Object.fromEntries(PARAMS.map(p => [p.key, p]));
-  const RULE_NAME = { lat: '위도', lon: '경도', alt: '고도', gs: '대지속도', vs: '수직속도', hdg: '방위', t: '수신 시각', altm: '고도 ft→m', gsm: '속도 kt→m/s', tns: '시각 초→ns', key: '기체 키', src: '출처 구분', info: '정보 없음 기준' };
+  const RULE_NAME = { lat: '위도', lon: '경도', alt: '고도', gs: '대지속도', vs: '수직속도', hdg: '방위', t: '수신 시각', altm: '고도 ft→m', gsm: '속도 kt→m/s', tns: '시각 초→ns', key: '기체 키', src: '출처 구분', info: '정보 없음 기준', prov: '빠진 항적 기다림' };
 
   // 원천별 필드와 변환식(가상 예시). [원천 필드, 원천 단위, 변환식, k, b] → 공통 값 = 원천 값 × k + b
   const R2D = 180 / Math.PI;
@@ -94,6 +95,7 @@
       key: ['tracks[].callsign · model', '—', 'callsign ?? model', null, 0, 'map'],
       src: ['tracks[].source', '—', 'xplane | absim | replay', null, 0, 'map'],
       info: ['received_at 경과', 'ms', '경과 > 2000 ms → 정보 없음', null, 0, 'map'],
+      prov: ['tracks[].held · held_ms(수신기)', 'ms', '스냅샷에서 빠지면 3초까지 마지막 값 유지 → 유지', null, 0, 'map'],
     },
   };
 
@@ -224,7 +226,7 @@
       [['par.signature_state', 'belongsTo', 'N:1']]],
     ['obs.external', 'obs', '외부 항적 관측', 'external_track_observation', 'surv', 'ABFAP가 보낸 외부 항적(제어 모드). 판정 결과가 아니므로 판정 입력으로 이어지지 않으며 화면은 "판정 없음(외부 항적)"으로 표시함. 기체 키는 callsign(없으면 model)이고 ABFAP에는 ICAO 24비트 주소가 없음. 출처 replay는 현재 시각으로 옮긴 재생 항적임. 마지막 유효 수신 후 2초(제어 모드 기준)가 지나면 정보 없음.',
       [['par.latitude_deg', 'belongsTo', 'N:1'], ['par.longitude_deg', 'belongsTo', 'N:1'], ['par.altitude_msl_m', 'belongsTo', 'N:1'], ['par.ground_speed_mps', 'belongsTo', 'N:1'],
-        ['par.heading_deg', 'belongsTo', 'N:1'], ['par.measured_utc_ns', 'timestamps', 'N:1'], ['par.aircraft_key', 'identifies', 'N:1'], ['par.track_source', 'classifies', 'N:1'], ['par.info_state', 'qualifies', 'N:1']]],
+        ['par.heading_deg', 'belongsTo', 'N:1'], ['par.measured_utc_ns', 'timestamps', 'N:1'], ['par.aircraft_key', 'identifies', 'N:1'], ['par.track_source', 'classifies', 'N:1'], ['par.info_state', 'qualifies', 'N:1'], ['par.value_provenance', 'qualifies', 'N:1']]],
     ...Object.entries(TEL_OBS).map(([id, name]) => [id, 'obs', `외부 항적 ${name}`, id.slice(4).replace('ext_', 'external_') + '_observation', 'surv',
       `ABFAP 상세 텔레메트리(telemetry)에서 변환한 ${name} 값. 원천 값이 -998 이하이거나 그룹·필드가 없으면 해당 없음. 표시 전용이며 판정 입력으로 이어지지 않음. 측정 시각은 항적의 ts이고 필드별 시각은 없음.`,
       [...TEL.filter(d => d.obs === id).map(d => [`par.${d.id}`, 'belongsTo', 'N:1']), ['par.measured_utc_ns', 'timestamps', 'N:1'], ['par.aircraft_key', 'identifies', 'N:1']]]),
@@ -458,6 +460,7 @@
     }
     if (n.pkey === 'key') return { inV: `callsign=${s.callsign ?? 'null'} · model=${s.model ?? 'null'}`, outV: `${acId} (${s.keyFrom})` };
     if (n.pkey === 'src') return { inV: s.source || '—', outV: SRC_LABEL[s.source] || '—' };
+    if (n.pkey === 'prov') return { inV: s.held ? `held=true · ${s.held_ms} ms` : 'held=false', outV: s.held ? '유지(수신기)' : '수신' };
     if (n.pkey === 'tns') {
       if (s.ts_ms == null) return null;
       return { inV: (s.ts_ms / 1000).toFixed(3), outV: (BigInt(Math.round(s.ts_ms)) * 1000000n).toString() };
