@@ -9,11 +9,14 @@
 // - 기체 키: ABFAP에는 ICAO 24비트 주소가 없으므로 callsign(없으면 model)을 기체 키로 씀.
 // - 단위 변환: alt_ft→m, kt→m/s, Unix 초→표시 시각(온톨로지는 ns). 원래 값(ft·kt)도 함께 둠.
 // - 재생: 수신기는 최신 1건만 두므로, 이 창이 연 뒤 받은 스냅샷을 창 메모리에 최근 30분까지 두고 재생에 씀.
+// - 상세 텔레메트리(tracks[].telemetry): 원본 그대로 기록에 붙이고 변환·표시는 온톨로지 변환 규칙(ontology.js)이 함.
+//   항적 1건이 수 KB이므로 창 메모리에는 최근 TEL_KEEP_MS 동안의 스냅샷에만 남기고 그보다 오래된 것은 지움.
 (function () {
   if (!TMS.CONTROL) return;
   const C = TMS.config, DEMO = TMS.mock;
   const FT = 0.3048, KT = 1852 / 3600;
   const WINDOW_MS = C.REPLAY_WINDOW_SEC * 1000;
+  const TEL_KEEP_MS = 120 * 1000;
 
   // 출처(source) 구분. replay는 ABFAP가 저장된 비행을 현재 시각으로 옮겨 다시 보내는 재생 항적임
   const SOURCES = {
@@ -32,6 +35,7 @@
   const prevSt = {};
   let logT = 0;
   let lastSnap = null;
+  const telSnaps = [];  // 상세 텔레메트리가 든 스냅샷(보관 기간 정리용)
   const info = { tries: 0, okCount: 0, lastOk: 0, lastErr: null, http: null, keyConfigured: null, stats: null, seenData: false };
 
   // 기체 키: callsign(없으면 model). 화면 식별자로 쓰므로 영문·숫자·_.-만 남기고 32자로 자름
@@ -60,6 +64,7 @@
     const alt_ft = num(tr.alt_ft), gs_kt = num(tr.speed_kt), hdg = num(tr.heading);
     const tsMs = num(tr.ts) == null ? null : tr.ts * 1000;
     const keyFrom = tr.callsign ? 'callsign' : 'model';
+    const tel = tr.telemetry && typeof tr.telemetry === 'object' ? tr.telemetry : null;
     const v = {
       lat: tr.lat, lon: tr.lon, alt_ft, alt_m: mul(alt_ft, FT), gs_kt, gs_ms: mul(gs_kt, KT),
       tas_kt: num(tr.tas_kt), tas_ms: mul(num(tr.tas_kt), KT), ias_kt: num(tr.ias_kt), ias_ms: mul(num(tr.ias_kt), KT),
@@ -72,10 +77,11 @@
         source: tr.source, callsign: tr.callsign || null, model: tr.model || null, gufi_id: tr.gufi_id || null,
         udp_connected: typeof tr.udp_connected === 'boolean' ? tr.udp_connected : null, session_id: num(tr.session_id),
         ts_ms: tsMs, keyFrom, seq: snap.seq, sent_at: snap.sent_at, rx_id: snap.rx_id,
+        telemetry: tel,
       },
       fused: { ...v, vs_fpm: null, ground: false, links: {} },
       // 온톨로지 데이터 미리보기용 원천 경로(공통 단위 값). t_last는 수신기 수신 시각(화면 시계 기준)
-      paths: { ABFAP: { state: 'ok', t_last: t, ...v, ts_ms: tsMs, source: tr.source, callsign: tr.callsign || null, model: tr.model || null, keyFrom } },
+      paths: { ABFAP: { state: 'ok', t_last: t, ...v, ts_ms: tsMs, source: tr.source, callsign: tr.callsign || null, model: tr.model || null, keyFrom, telemetry: tel } },
       fusion: { flag: 'none', diff_m: null },
       proc: { id: null, label: '절차 정보 없음(외부 항적)' },
       telemetry_links: [],
@@ -135,6 +141,7 @@
           const tRx = Math.round((t0 + t1) / 2 - Math.max(0, Number(j.age_ms) || 0));
           snap = ingest(j, lastSnap ? Math.max(tRx, lastSnap.t + 1) : tRx);
           lastSnap = snap;
+          if (snap.recs.some(r => r.ext.telemetry)) telSnaps.push(snap);
         }
       }
       entry = { t: t1, ok: true, snap };
@@ -150,6 +157,11 @@
     timeline.push(entry);
     const lo = Date.now() - WINDOW_MS;
     while (timeline.length && timeline[0].t < lo) timeline.shift();
+    // 오래된 스냅샷의 상세 텔레메트리는 지움(재생 시 "보관 안 함"으로 표시)
+    const telLo = Date.now() - TEL_KEEP_MS;
+    while (telSnaps.length && telSnaps[0].t < telLo) {
+      telSnaps.shift().recs.forEach(r => { if (r.ext.telemetry) { r.ext.telemetry = null; r.ext.telDropped = true; r.paths.ABFAP.telemetry = null; } });
+    }
     Object.values(tracks).forEach(arr => { while (arr.length && arr[0][0] < lo) arr.shift(); });
     setTimeout(poll, Math.max(100, C.CONTROL_POLL_MS - (Date.now() - t0)));
   }

@@ -97,6 +97,119 @@
     },
   };
 
+  // ABFAP 상세 텔레메트리(tracks[].telemetry, ABFAP_Track_Telemetry_Guide.md) → 공통 파라미터.
+  // 관측 노드 obs.ext_*로 묶이며 판정 입력으로 이어지지 않음(표시 전용). 값은 수신한 원천 값을 변환식으로 바꾼 것임.
+  // [키, 공통 파라미터, 이름, 단위, 관측 노드, 원천 위치, 원천 단위, k, 자릿수, 선택]
+  //   원천 위치: xplane·replay는 '그룹.필드'(X = 장치 번호 1~5), absim은 'absim:필드'
+  //   공통 값 = 원천 값 × k. 원천 값이 -998 이하이면 해당 없음(X-Plane 빈 슬롯)
+  const TEL_INVALID = -998;
+  const TEL_OBS = {
+    'obs.ext_state': '비행 상태',
+    'obs.ext_power': '동력·전원',
+    'obs.ext_env': '대기·바람',
+  };
+  const TEL_DEFS = [
+    ['t_vs', 'vertical_rate_mps', '수직속도', 'm/s', 'obs.ext_state', 'mach.vvi_fpm', 'fpm', 0.00508, 2],
+    ['t_mach', 'mach_number', '마하수', '—', 'obs.ext_state', 'mach.mach', '—', 1, 3],
+    ['t_gn', 'load_factor_normal_g', '수직 하중배수', 'g', 'obs.ext_state', 'mach.gload_normal', 'g', 1, 2],
+    ['t_ga', 'load_factor_axial_g', '전후 하중배수', 'g', 'obs.ext_state', 'mach.gload_axial', 'g', 1, 2],
+    ['t_gs', 'load_factor_side_g', '측면 하중배수', 'g', 'obs.ext_state', 'mach.gload_side', 'g', 1, 2],
+    ['t_aoa', 'angle_of_attack_deg', '받음각', 'deg', 'obs.ext_state', 'aoa.aoa_deg', 'deg', 1, 1],
+    ['t_beta', 'sideslip_angle_deg', '옆미끄럼각', 'deg', 'obs.ext_state', 'aoa.beta_deg', 'deg', 1, 1],
+    ['t_fpa', 'flight_path_angle_deg', '비행경로각', 'deg', 'obs.ext_state', 'aoa.vert_path_deg', 'deg', 1, 1],
+    ['t_trk', 'track_true_deg', '진행 방향(진북)', 'deg', 'obs.ext_state', 'aoa.hori_path_deg', 'deg', 1, 1],
+    ['t_agl', 'height_agl_m', '지면 위 고도', 'm', 'obs.ext_state', 'position.gear_height_ftagl', 'ft', 0.3048, 1],
+    ['t_palt', 'pressure_altitude_m', '기압 고도', 'm', 'obs.ext_state', 'position.press_alt_ftmsl', 'ft', 0.3048, 1],
+    ['t_uam', 'uam_status', 'UAM 상태', '—', 'obs.ext_state', 'absim:uam_status', '—', null, 0],
+    ['t_erpm', 'engine_speed_rpm', '엔진 회전수', 'rpm', 'obs.ext_power', 'engine_rpm.engineX_rpm', 'rpm', 1, 0],
+    ['t_etq', 'engine_torque_nm', '엔진 토크', 'N·m', 'obs.ext_power', 'engine_torque.engineX_tq_nm', 'N·m', 1, 1],
+    ['t_prpm', 'prop_speed_rpm', '프롭 회전수', 'rpm', 'obs.ext_power', 'prop_rpm.propX_rpm', 'rpm', 1, 0],
+    ['t_thr', 'rotor_thrust_n', '로터 추력', 'N', 'obs.ext_power', 'rotor_thrust.rotorX_thrust_lb', 'lb', 4.4482216, 0],
+    ['t_thl', 'throttle_command_pct', '스로틀 명령', '%', 'obs.ext_power', 'pilot_throttle.throttleX_cmd', '0~1', 100, 0],
+    ['t_bv', 'battery_voltage_v', '배터리 전압', 'V', 'obs.ext_power', 'battery_volt.batteryX_volt', 'V', 1, 1],
+    ['t_ba', 'battery_current_a', '배터리 전류', 'A', 'obs.ext_power', 'battery_amp.batteryX_amp', 'A', 1, 1],
+    ['t_bt', 'battery_temperature_c', '배터리 온도', '°C', 'obs.ext_power', 'battery_temp.batteryX_temp_degc', '°C', 1, 1],
+    ['t_bw', 'battery_energy_wh', '배터리 잔여 에너지', 'Wh', 'obs.ext_power', 'battery_wh.batteryX_wh', 'Wh', 1, 0],
+    ['t_wspd', 'wind_speed_mps', '풍속', 'm/s', 'obs.ext_env', 'weather.hori_wind_knots', 'kt', 0.514444, 1],
+    ['t_wdir', 'wind_direction_deg', '풍향', 'deg', 'obs.ext_env', 'weather.wind_dir_deg', 'deg', 1, 0],
+    ['t_wvert', 'vertical_wind_mps', '수직 바람', 'm/s', 'obs.ext_env', 'weather.vert_wind_fpm', 'fpm', 0.00508, 2],
+    ['t_turb', 'turbulence_ratio', '난류 강도', '—', 'obs.ext_env', 'weather.turb', '0~1', 1, 2],
+    ['t_oat', 'outside_air_temperature_c', '외기 온도', '°C', 'obs.ext_env', 'environment.am_tmp_degc', '°C', 1, 1],
+    ['t_prs', 'ambient_pressure_hpa', '대기압', 'hPa', 'obs.ext_env', 'environment.am_prs_inhg', 'inHg', 33.8639, 1],
+    ['t_rho', 'air_density_ratio', '공기 밀도비', '—', 'obs.ext_env', 'environment.dens_ratio', '—', 1, 3],
+  ];
+  const TEL = TEL_DEFS.map(([key, id, name, unit, obs, at, srcUnit, k, digits]) => {
+    const absim = at.startsWith('absim:');
+    const [g, f] = absim ? [null, at.slice(6)] : at.split('.');
+    return { key, id, name, unit, obs, g, f, absim, idx: !absim && f.includes('X'), srcUnit, k, digits };
+  });
+  const telByKey = Object.fromEntries(TEL.map(d => [d.key, d]));
+  TEL.forEach(d => {
+    const par = { id: d.id, key: d.key, name: d.name, unit: d.unit, dtype: d.absim ? 'string' : 'float32', domain: 'surv', tel: true };
+    PARAMS.push(par);
+    parByKey[d.key] = par;
+    RULE_NAME[d.key] = d.name;
+    const field = d.absim ? `telemetry.${d.f} (absim)` : `telemetry.${d.g}.${d.idx ? d.f.replace('X', '{1~5}') : d.f}`;
+    const formula = d.absim ? '문자열 그대로' : `${d.k === 1 ? 'value' : `value × ${d.k}`} (≤ -998 → 해당 없음)`;
+    FORMATS.ABFAP[d.key] = [field, d.srcUnit, formula, d.k, 0, d.absim ? 'telmap' : 'tel'];
+  });
+
+  // 상세 텔레메트리 한 항목의 원천 값과 변환 값. 장치 번호 항목은 번호별로 돌려줌. 없거나 해당 없음이면 빈 배열
+  function telConvert(tel, source, d) {
+    if (!tel) return [];
+    if (d.absim) {
+      if (source !== 'absim') return [];
+      const v = tel[d.f];
+      return v == null || v === '' ? [] : [{ n: null, raw: v, out: String(v) }];
+    }
+    if (source === 'absim') return [];
+    const grp = tel[d.g];
+    if (!grp || Array.isArray(grp) || typeof grp !== 'object') return [];
+    const one = (f, n) => {
+      const v = grp[f];
+      return typeof v === 'number' && isFinite(v) && v > TEL_INVALID ? { n, raw: v, out: v * d.k } : null;
+    };
+    if (!d.idx) { const r = one(d.f, null); return r ? [r] : []; }
+    const out = [];
+    for (let n = 1; n <= 5; n++) { const r = one(d.f.replace('X', n), n); if (r) out.push(r); }
+    return out;
+  }
+  // 장치 번호: 동력·전원 항목 중 0이 아닌 값이 하나라도 있는 번호만 씀(쓰지 않는 번호는 0으로 옴). 모두 0이면 1번만
+  function telDevices(tel, source) {
+    const seen = new Set(), any = new Set();
+    TEL.filter(d => d.idx).forEach(d => telConvert(tel, source, d).forEach(r => { any.add(r.n); if (r.raw !== 0) seen.add(r.n); }));
+    return seen.size ? seen : any.has(1) ? new Set([1]) : new Set();
+  }
+  const telFmt = (d, v) => (typeof v === 'number' ? v.toLocaleString('en-US', { minimumFractionDigits: d.digits, maximumFractionDigits: d.digits }) : String(v));
+  const telRaw = v => (typeof v === 'number' ? v.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(v));
+  // 원천 위치(그룹.필드, absim은 필드) → 공통 파라미터. 원본 표에서 대응 여부를 보이는 데 씀
+  const TEL_FIELD = {};
+  TEL.forEach(d => {
+    if (d.absim) TEL_FIELD[d.f] = d.id;
+    else if (d.idx) for (let n = 1; n <= 5; n++) TEL_FIELD[`${d.g}.${d.f.replace('X', n)}`] = `${d.id}[${n}]`;
+    else TEL_FIELD[`${d.g}.${d.f}`] = d.id;
+  });
+  // 평면 필드와 같은 값(ABFAP_Track_Telemetry_Guide.md 4장 대응표). 같은 값이 두 곳에 있으면 평면 필드를 씀
+  const SAME = ' · 평면 필드와 같음';
+  Object.entries({
+    'position.latitude': 'latitude_deg', 'position.longitude': 'longitude_deg', 'position.cg_alt_ftmsl': 'altitude_msl_m', 'attitude.true_hdg_deg': 'heading_deg',
+    'attitude.pitch_deg': 'tracks[].pitch', 'attitude.roll_deg': 'tracks[].roll', 'speed.vind_kias': 'tracks[].ias_kt', 'speed.vtrue_ktas': 'tracks[].tas_kt', 'speed.vtrue_ktgs': 'ground_speed_mps',
+    lat: 'latitude_deg', lon: 'longitude_deg', alt: 'altitude_msl_m', hdg: 'heading_deg', spd: 'ground_speed_mps', pitch: 'tracks[].pitch', roll: 'tracks[].roll',
+    tas: 'tracks[].tas_kt', cas: 'tracks[].cas_kt', callsign: 'aircraft_key', model: 'aircraft_key', gufi_id: 'tracks[].gufi_id', udp_connected: 'tracks[].udp_connected',
+  }).forEach(([k, v]) => { TEL_FIELD[k] = v + SAME; });
+  // 기체 상세(제어 모드)용: 상세 텔레메트리를 변환 규칙으로 바꿔 관측 노드별로 묶음. 출처에 해당하지 않는 항목은 뺌
+  function telemetryView(tel, source) {
+    const devs = telDevices(tel, source);
+    const groups = Object.entries(TEL_OBS).map(([obs, name]) => {
+      const rows = TEL.filter(d => d.obs === obs && d.absim === (source === 'absim')).map(d => ({
+        key: d.key, id: d.id, name: d.name, unit: d.unit, srcUnit: d.srcUnit, idx: d.idx, scaled: d.k !== 1 && d.k != null,
+        vals: telConvert(tel, source, d).filter(r => r.n == null || devs.has(r.n)).map(r => ({ n: r.n, raw: telRaw(r.raw), out: telFmt(d, r.out) })),
+      }));
+      return { obs, name, rows };
+    }).filter(g => g.rows.length);
+    return { groups, field: TEL_FIELD, invalid: TEL_INVALID };
+  }
+
   // 관측 이후 노드: [식별자, 유형, 이름, 정의 이름, 도메인, 설명, [[상위 노드, 관계, 기수], ...]]
   const DERIVED = [
     ['obs.position', 'obs', '위치 관측', 'position_observation', 'surv', '위도·경도·고도를 같은 수신 시각 기준으로 묶은 관측.',
@@ -110,6 +223,9 @@
     ['obs.external', 'obs', '외부 항적 관측', 'external_track_observation', 'surv', 'ABFAP가 보낸 외부 항적(제어 모드). 판정 결과가 아니므로 판정 입력으로 이어지지 않으며 화면은 "판정 없음(외부 항적)"으로 표시함. 기체 키는 callsign(없으면 model)이고 ABFAP에는 ICAO 24비트 주소가 없음. 출처 replay는 현재 시각으로 옮긴 재생 항적임. 마지막 유효 수신 후 2초(제어 모드 기준)가 지나면 정보 없음.',
       [['par.latitude_deg', 'belongsTo', 'N:1'], ['par.longitude_deg', 'belongsTo', 'N:1'], ['par.altitude_msl_m', 'belongsTo', 'N:1'], ['par.ground_speed_mps', 'belongsTo', 'N:1'],
         ['par.heading_deg', 'belongsTo', 'N:1'], ['par.measured_utc_ns', 'timestamps', 'N:1'], ['par.aircraft_key', 'identifies', 'N:1'], ['par.track_source', 'classifies', 'N:1'], ['par.info_state', 'qualifies', 'N:1']]],
+    ...Object.entries(TEL_OBS).map(([id, name]) => [id, 'obs', `외부 항적 ${name}`, id.slice(4).replace('ext_', 'external_') + '_observation', 'surv',
+      `ABFAP 상세 텔레메트리(telemetry)에서 변환한 ${name} 값. 원천 값이 -998 이하이거나 그룹·필드가 없으면 해당 없음. 표시 전용이며 판정 입력으로 이어지지 않음. 측정 시각은 항적의 ts이고 필드별 시각은 없음.`,
+      [...TEL.filter(d => d.obs === id).map(d => [`par.${d.id}`, 'belongsTo', 'N:1']), ['par.measured_utc_ns', 'timestamps', 'N:1'], ['par.aircraft_key', 'identifies', 'N:1']]]),
     ['in.deviation', 'input', '경로 이탈', 'route_deviation', 'verdict', '절차 경로와의 거리. 판정은 판정 엔진이 수행함.',
       [['obs.position', 'inputOf', 'N:N'], ['src.POLICY', 'limits', '1:N']]],
     ['in.speed', 'input', '구간 속도 초과', 'speed_limit', 'verdict', '구간별 속도 한계와의 비교. 판정은 판정 엔진이 수행함.',
@@ -123,7 +239,8 @@
     ['in.redundancy', 'input', '링크 이중화', 'link_redundancy', 'verdict', '운항 배정 링크 구성 대비 수신 링크. 구성 미지정이면 판단하지 않음.',
       [['obs.link', 'inputOf', 'N:N'], ['src.FPL', 'configures', '1:N']]],
     ['ev.observation', 'event', '기체 관측', 'flight_observation', 'surv', '관측을 시각과 원천 기준으로 비행에 연결함.',
-      [['obs.position', 'belongsTo', 'N:1'], ['obs.motion', 'belongsTo', 'N:1'], ['obs.link', 'belongsTo', 'N:1'], ['obs.signature', 'belongsTo', 'N:1'], ['obs.external', 'belongsTo', 'N:1']]],
+      [['obs.position', 'belongsTo', 'N:1'], ['obs.motion', 'belongsTo', 'N:1'], ['obs.link', 'belongsTo', 'N:1'], ['obs.signature', 'belongsTo', 'N:1'], ['obs.external', 'belongsTo', 'N:1'],
+        ...Object.keys(TEL_OBS).map(id => [id, 'belongsTo', 'N:1'])]],
     ['ev.verdict', 'event', '판정 결과 기록', 'verdict_result', 'verdict', '판정 엔진의 상태·사유·항목. 화면은 표시만 함.',
       [['src.ENGINE', 'produces', '1:N'], ['in.deviation', 'evaluatedBy', 'N:1'], ['in.speed', 'evaluatedBy', 'N:1'], ['in.descent', 'evaluatedBy', 'N:1'],
         ['in.mismatch', 'evaluatedBy', 'N:1'], ['in.loss', 'evaluatedBy', 'N:1'], ['in.redundancy', 'evaluatedBy', 'N:1']]],
@@ -222,9 +339,23 @@
     // 변환 규칙: 공통 파라미터별 묶음 상자 안에 원천 순으로 옆으로 놓고, 묶음을 위에서 아래로 쌓음
     let y = TOP;
     const groups = [];
+    // 상세 텔레메트리 묶음(규칙 1개)은 두 개씩 옆으로 놓아 세로 길이를 줄임
+    const HALF = (RULE_W - RGAPX) / 2;
+    let half = null; // 왼쪽 칸에 놓인 묶음의 y
     PARAMS.forEach(p => {
       const rules = SENSORS.map(src => `rule.${src}.${p.key}`).filter(id => byId[id] && on(id));
       if (!rules.length) return;
+      if (p.tel && rules.length === 1) {
+        const right = half != null;
+        const gy = right ? half : y;
+        const gx = x(1) + (right ? HALF + RGAPX : 0);
+        P[rules[0]] = [gx + (HALF - NW) / 2, gy + RHEAD];
+        const h = RHEAD + NH + RPAD;
+        groups.push({ param: p, n: 1, x: gx, y: gy, w: HALF, h });
+        if (right) { half = null; } else { half = y; y += h + RGROUP_GAP; }
+        return;
+      }
+      half = null;
       const cols = Math.min(RULE_COLS, rules.length);
       const rows = Math.ceil(rules.length / cols);
       rules.forEach((id, i) => { P[id] = [x(1) + RPAD + (i % cols) * (NW + RGAPX), y + RHEAD + Math.floor(i / cols) * (NH + RGAPY)]; });
@@ -343,6 +474,13 @@
       return { st: stale ? '<span class="st-tag st-tag--nodata">정보 없음</span>' : '<span class="st-text st-text--normal">수신</span>', inV: v.inV, outV: v.outV, at: kstMs(s.t_last), age };
     }
     if (sampleStale(s, acId)) return { st: '<span class="st-tag st-tag--nodata">정보 없음</span>', inV: '—', outV: '—', at: kstMs(s.t_last), age };
+    if (n.kind === 'tel' || n.kind === 'telmap') {
+      const d = telByKey[n.pkey];
+      const vals = telConvert(s.telemetry, s.source, d);
+      if (!vals.length) return { st: `<span class="st-text--na">${s.telemetry ? '해당 없음' : '상세 텔레메트리 없음'}</span>`, inV: '—', outV: '—', at: kstMs(s.t_last), age };
+      const list = f => vals.map(r => `${r.n ? `${r.n}: ` : ''}${f(r)}`).join(' · ');
+      return { st: '<span class="st-text st-text--normal">수신</span>', inV: esc(list(r => telRaw(r.raw))), outV: esc(list(r => telFmt(d, r.out))), at: kstMs(s.t_last), age };
+    }
     if (n.src === 'ABFAP' && (n.kind === 'map' || n.pkey === 'tns')) {
       const v = abfapValue(n, s, acId);
       if (!v) return { st: '<span class="st-text--na">값 없음</span>', inV: '—', outV: '—', at: kstMs(s.t_last), age };
@@ -908,5 +1046,5 @@
     return false;
   }
 
-  TMS.ontology = { update, clear, focusSearch };
+  TMS.ontology = { update, clear, focusSearch, telemetryView };
 })();

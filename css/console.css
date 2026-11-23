@@ -945,3 +945,12 @@ body.is-control .chip--policy, body.is-control #chip-clock, body.is-control #chi
 .lg--replay { border: 1.5px dashed #e2c9ff; }
 body.is-control .demo-only { display: none !important; }
 body:not(.is-control) .ctl-only { display: none !important; }
+
+/* 제어 모드 상세 텔레메트리(온톨로지 변환) */
+.tel-grp + .tel-grp { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.tel-grp h4 { margin: 0 0 10px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.tel-grp h4 small { margin-left: 6px; font-weight: 400; color: var(--muted); }
+.sec__body .tel-grp ~ .d-hint, .sec__body .d-hint:first-child { padding: 10px 0 0; }
+.tbl--telraw { width: 100%; font-size: 12px; }
+.tbl--telraw td { padding: 3px 6px; }
+.tbl--telraw tr.is-mapped td:nth-child(2), .tbl--telraw tr.is-mapped td:nth-child(4) { color: var(--external); }

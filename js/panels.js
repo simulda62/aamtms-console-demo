@@ -312,7 +312,7 @@
   let showStale = false;
   let opChoice = null;
   let opRendered = -1;
-  const open = new Set(['ov', 'data', 'items', 'paths', 'proc', 'ver', 'op']);
+  const open = new Set(['ov', 'data', 'tel', 'items', 'paths', 'proc', 'ver', 'op']);
   const q = k => document.querySelector(`#detail [data-k="${k}"]`);
   const section = (key, title, body) => `<section class="sec${open.has(key) ? ' is-open' : ''}" data-sec="${key}">
     <button type="button" class="sec__head">${title}<i></i></button><div class="sec__body">${body}</div></section>`;
@@ -403,6 +403,8 @@
         </div>
         <div class="d-body">
           ${section('data', '항적 데이터 <small>ABFAP 값을 m·m/s로 변환</small>', '<dl class="kv2" data-k="data"></dl>')}
+          ${section('tel', '상세 텔레메트리 <small>온톨로지 변환 규칙 적용 · 표시 전용</small>', '<div data-k="tel"></div>')}
+          ${section('telraw', '텔레메트리 원본 <small>ABFAP telemetry 그대로 · 공통 파라미터 대응</small>', '<div data-k="telraw"></div>')}
           ${section('items', '판정 <small>판정 엔진 결과 아님</small>', `<div class="ext-note"><b>판정 없음(외부 항적)</b><p>ABFAP 항적은 판정 결과가 아니므로 판정 단계(정상·주의·경고·비상)를 붙이지 않고 위치·속도만 표시함. 마지막 유효 수신 후 ${(TMS.staleMs() / 1000).toFixed(0)}초가 지나면 정보 없음으로 바꾸고 위치를 숨김.</p></div>`)}
           ${section('paths', 'ABFAP 전송 정보 <small>수신기 X-API-Key 검증</small>', '<dl class="kv2" data-k="abfap"></dl>')}
           <p class="d-hint">기체 키는 callsign(없으면 model)임. ABFAP 항적에는 ICAO 24비트 주소가 없음. 판정이 없는 외부 항적이므로 병행 운용 판단 기록은 두지 않음.</p>
@@ -540,6 +542,46 @@
     }
   }
 
+  // 상세 텔레메트리: 온톨로지(ontology.js)의 변환 규칙으로 바꾼 값을 관측 노드별로 표시함. 값이 없는 항목은 숨기고 개수만 알림
+  function telEmpty(r, x, f) {
+    if (!r) return '<p class="muted">수신 이력 없음</p>';
+    if (!f) return '<p class="muted">정보 없음</p>';
+    if (x.telDropped) return '<p class="muted">상세 텔레메트리는 최근 2분만 보관함(이 재생 시점의 값 없음)</p>';
+    if (!x.telemetry) return '<p class="muted">상세 텔레메트리 없음(ABFAP가 telemetry를 보내지 않음)</p>';
+    return null;
+  }
+  function telHtml(r, x, f, tv) {
+    const e = telEmpty(r, x, f);
+    if (e) return e;
+    let hidden = 0;
+    const html = tv.groups.map(g => {
+      const rows = g.rows.filter(row => row.vals.length || (hidden++, false)).map(row => {
+        const unit = row.unit === '—' ? '' : row.unit === 'deg' ? '°' : ` ${row.unit}`;
+        const val = row.vals.map(v => `${v.n ? `<small class="muted">${v.n}:</small> ` : ''}${F.esc(v.out)}`).join(' · ');
+        const raw = row.scaled && !row.idx ? ` <small class="muted">${row.vals[0].raw} ${row.srcUnit}</small>` : '';
+        return [row.name, `${val}${unit}${raw}`];
+      });
+      return `<div class="tel-grp"><h4>${g.name} <small class="mono">${g.obs}</small></h4>${rows.length ? `<dl class="kv2">${kv(rows)}</dl>` : '<p class="muted">값 없음</p>'}</div>`;
+    }).join('');
+    return `${html}<p class="d-hint">변환식과 관계는 온톨로지 화면의 ABFAP 변환 규칙에 정의됨. 판정 입력이 아님.${hidden ? ` 값이 없는 항목 ${hidden}개는 숨김(X-Plane Data Output에서 켜지 않은 그룹이거나 해당 없음).` : ''}</p>`;
+  }
+  // 텔레메트리 원본: 받은 그룹·필드 전체. 공통 파라미터에 대응하는 필드는 대응 이름을 붙임. 이름 없는 슬롯(_dummy_)은 뺌
+  function telRawHtml(r, x, f, tv) {
+    const e = telEmpty(r, x, f);
+    if (e) return e;
+    const cell = v => (typeof v === 'number' ? (v <= tv.invalid ? '<span class="muted">해당 없음</span>' : (+v.toFixed(4)).toString()) : v == null ? '<span class="muted">null</span>' : F.esc(String(v)));
+    const rows = [];
+    Object.entries(x.telemetry).forEach(([g, v]) => {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        Object.entries(v).forEach(([k, val]) => { if (!k.startsWith('_')) rows.push([g, k, cell(val), tv.field[`${g}.${k}`]]); });
+      } else if (Array.isArray(v)) rows.push([g, '[8]', v.map(cell).join(', '), null]);
+      else rows.push(['—', g, cell(v), tv.field[g]]);
+    });
+    const mapped = rows.filter(row => row[3]).length;
+    return `<p class="d-hint">필드 ${rows.length}개 · 공통 파라미터 대응 ${mapped}개</p><table class="tbl tbl--telraw"><thead><tr><th>그룹</th><th>필드</th><th class="r">값</th><th>공통 파라미터</th></tr></thead><tbody>
+      ${rows.map(([g, k, v, p]) => `<tr${p ? ' class="is-mapped"' : ''}><td class="mono">${F.esc(g)}</td><td class="mono">${F.esc(k)}</td><td class="r mono">${v}</td><td class="mono">${p ? F.esc(p) : '<span class="muted">—</span>'}</td></tr>`).join('')}</tbody></table>`;
+  }
+
   // 제어 모드 기체 상세: ABFAP 값(단위 변환)과 전송 정보. 정보 없음이면 값을 숨김
   function updateDetailControl(id, r, st, fresh) {
     const ac = acOf(id);
@@ -565,6 +607,9 @@
       ['측정 시각', f && x.ts_ms != null ? `<span class="mono">${kstMs(x.ts_ms)}</span> KST` : dash],
       ['마지막 수신', fresh ? ago(S.now - r.t) : `<span class="st-text--nodata">${ago(S.now - r.t)} 경과</span>`],
     ]) : '<p class="muted">수신 이력 없음</p>';
+    const tv = r && x.telemetry && TMS.ontology ? TMS.ontology.telemetryView(x.telemetry, x.source) : null;
+    q('tel').innerHTML = telHtml(r, x, f, tv);
+    if (q('telraw').closest('.sec').classList.contains('is-open')) q('telraw').innerHTML = telRawHtml(r, x, f, tv);
     const sent = x ? Date.parse(x.sent_at) : NaN;
     q('abfap').innerHTML = r ? kv([
       ['출처(source)', `${SRC[x.source].label} <small class="muted">${SRC[x.source].note}</small>`],
