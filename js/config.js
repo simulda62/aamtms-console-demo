@@ -64,7 +64,20 @@ TMS.config = {
   // 지도 경보 띠: 확인하지 않아도 발생 후 이 시간(초)이 지나면 띠에서 내림. 미확인 상태는 경보·이벤트 목록과 탭 숫자에 그대로 남음
   ALERT_STRIP_HIDE_SEC: 300,
   OPERATOR: '관제 요원(데모)',
+  // 제어 모드(ABFAP 항적 수신). 수신기는 같은 출처의 상대 경로로 조회함(접속 정보를 화면 코드에 넣지 않음)
+  CONTROL_SNAPSHOT_URL: 'api/abfap/snapshot',
+  CONTROL_POLL_MS: 500,
+  // 제어 모드 정보 없음 기준(2026-11-23 사용자 선택): ABFAP는 1초마다 보내므로 1초 기준으로는 전송 간격·지연만으로 깜빡임.
+  // 전송 1회 누락까지는 유지하고 그보다 늦으면 정보 없음으로 바꿈. 데모 각본의 기준(STALE_MS 1초)은 그대로 둠
+  CONTROL_STALE_MS: 2000,
+  // 보낸 항적에서 빠진 뒤 이 시간(초)이 지나면 목록·지도에서 내림(그 전까지는 정보 없음으로 남김)
+  CONTROL_DROP_SEC: 300,
 };
+
+// 데이터 공급원: 데모 각본(기본) 또는 제어 모드(?mode=control, ABFAP 항적 수신). 창마다 주소로 정하며,
+// 제어 모드 창은 데모 창과 연동 채널을 나누어 따로 돌아감
+TMS.CONTROL = new URLSearchParams(location.search).get('mode') === 'control';
+if (TMS.CONTROL) TMS.config.CHANNEL += '-control';
 
 // 기준 위치 목록. 기본은 성산일출봉(사용자 지정, 2026-10-06).
 TMS.LOCATION_PRESETS = {
@@ -160,7 +173,8 @@ TMS.LOCATION = (function () {
 TMS.config.MAP_CENTER = TMS.LOCATION.ll;
 
 // 정보 없음 판단: 마지막 유효 수신 후 경과 시간이 기준을 넘으면 참
-TMS.isStale = ageMs => ageMs > TMS.config.STALE_MS;
+TMS.staleMs = () => (TMS.CONTROL ? TMS.config.CONTROL_STALE_MS : TMS.config.STALE_MS);
+TMS.isStale = ageMs => ageMs > TMS.staleMs();
 
 // 표시 상태 정의. 판정 자체는 판정 엔진이 수행하며 화면은 표시만 함.
 // rank: 목록 정렬 우선순위(작을수록 위)
@@ -170,6 +184,8 @@ TMS.STATUS = {
   nodata:    { label: '정보 없음', glyph: '◌', rank: 2 },
   caution:   { label: '주의', glyph: '▲', rank: 3 },
   normal:    { label: '정상', glyph: '●', rank: 4 },
+  // 제어 모드: 외부(ABFAP) 항적은 판정 결과가 아니므로 판정 단계를 붙이지 않음
+  external:  { label: '판정 없음(외부 항적)', glyph: '◇', rank: 5 },
   na:        { label: '미적용', glyph: '–', rank: 9 },
 };
 

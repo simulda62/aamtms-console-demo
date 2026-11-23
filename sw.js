@@ -3,7 +3,7 @@
 // - 연결되어 있으면 항상 새 파일을 받고(네트워크 우선) 받은 것을 보관함. 연결이 없으면 보관본을 씀.
 // - 한 번 열면 그다음부터는 인터넷 없이도 열리고 작동함.
 const CACHE = 'aamtms-console-demo-v1';
-// 서비스 워커 갱신 표시(내용을 바꾸면 브라우저가 새 서비스 워커를 설치함): 2026-10-08 화면 재확인
+// 서비스 워커 갱신 표시(내용을 바꾸면 브라우저가 새 서비스 워커를 설치함): 2026-11-23 수신기 조회 제외
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -40,6 +40,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // 외부 자원은 관여하지 않음
   if (url.pathname.endsWith('.zip')) return; // 내려받기용 압축 파일은 보관하지 않음
+  if (url.pathname.includes('/api/')) return; // 수신기 조회(제어 모드)는 보관하지 않음: 연결이 없을 때 오래된 값을 최신처럼 보이지 않게 함
   const nav = req.mode === 'navigate';
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);

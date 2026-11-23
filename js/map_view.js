@@ -25,6 +25,11 @@
   const procSegs = {};
   const markers = {}, trails = {}, raws = {};
   let tileErrors = 0;
+  // 제어 모드(ABFAP 항적): 기체가 수신에 따라 생기고 없어지며, 정보 없음이면 위치(표식·항적)를 숨김
+  const CTL = !!M.control;
+  const SRC = M.SOURCES || {};
+  // 자동 맞춤: 사용자가 지도를 움직이기 전까지 새 항적이 보이면 받은 항적 전체에 다시 맞춤
+  let mapAcVer = -1, ctlFitKey = '', ctlUserMoved = false;
 
 
   // 인터넷 연결이 없으면 외부 지도 타일 대신 격자 배경을 쓰고, 연결이 돌아오면 고른 배경으로 되돌림
@@ -56,7 +61,7 @@
       className: 'mk-icon',
       iconSize: [32, 32],
       iconAnchor: [16, 16],
-      html: `<div class="mk${ac.virtual ? ' mk--virtual' : ''}">
+      html: `<div class="mk${ac.virtual ? ' mk--virtual' : ''}${ac.replay ? ' mk--replay' : ''}">
         <svg class="mk__svg" viewBox="-16 -16 32 32">
           <rect class="mk__halo" x="-12" y="-12" width="24" height="24" transform="rotate(45)"/>
           <g class="mk__hdg"><line x1="0" y1="-9" x2="0" y2="-15"/></g>
@@ -122,17 +127,7 @@
       L.marker(v.ll, { interactive: false, icon: L.divIcon({ className: 'vp-icon', html: `<div class="vp">H</div><div class="vp__label">${v.name || v.id} <i>가상</i></div>`, iconSize: [20, 20], iconAnchor: [10, 10] }) }).addTo(procLayer);
     });
 
-    M.AIRCRAFT.forEach(ac => {
-      trails[ac.id] = L.polyline([], { color: COLORS.trail, weight: 1.5, opacity: 0.4, interactive: false, className: ac.virtual ? 'trail trail--virtual' : 'trail' }).addTo(trailLayer);
-      const mk = L.marker(M.toLL(0, 0), { icon: acIcon(ac), keyboard: false, riseOnHover: true }).addTo(acLayer);
-      mk.on('click', () => S.select(ac.id));
-      markers[ac.id] = mk;
-      raws[ac.id] = {
-        adsb: L.marker(M.toLL(0, 0), { interactive: false, icon: L.divIcon({ className: 'raw raw--adsb', iconSize: [8, 8], iconAnchor: [4, 4], html: '' }) }),
-        tlm: L.circleMarker(M.toLL(0, 0), { radius: 4, color: COLORS.tlm, weight: 1.5, fillOpacity: 0, interactive: false }),
-        link: L.polyline([], { color: COLORS.adsb, weight: 1.5, dashArray: '3 4', interactive: false }),
-      };
-    });
+    syncAircraft();
 
     // 배경 지도는 열 때마다 위성으로 시작함(이전 선택을 기억하지 않음)
     setBasemap('satellite');
@@ -149,15 +144,48 @@
       const c = document.getElementById('cursor-ll');
       if (c) c.textContent = `${e.latlng.lat.toFixed(5)}° N · ${e.latlng.lng.toFixed(5)}° E`;
     });
-    map.on('dragstart', () => { if (S.follow) S.setFollow(false); });
+    map.on('dragstart', () => { if (S.follow) S.setFollow(false); ctlUserMoved = true; });
+    map.getContainer().addEventListener('wheel', () => { ctlUserMoved = true; }, { passive: true });
     bindControls();
     bindLocation();
   }
 
+  function addAircraft(ac) {
+    trails[ac.id] = L.polyline([], { color: COLORS.trail, weight: 1.5, opacity: 0.4, interactive: false, className: ac.virtual ? 'trail trail--virtual' : ac.replay ? 'trail trail--replay' : 'trail' }).addTo(trailLayer);
+    const mk = L.marker(M.toLL(0, 0), { icon: acIcon(ac), keyboard: false, riseOnHover: true }).addTo(acLayer);
+    mk.on('click', () => S.select(ac.id));
+    markers[ac.id] = mk;
+    raws[ac.id] = {
+      adsb: L.marker(M.toLL(0, 0), { interactive: false, icon: L.divIcon({ className: 'raw raw--adsb', iconSize: [8, 8], iconAnchor: [4, 4], html: '' }) }),
+      tlm: L.circleMarker(M.toLL(0, 0), { radius: 4, color: COLORS.tlm, weight: 1.5, fillOpacity: 0, interactive: false }),
+      link: L.polyline([], { color: COLORS.adsb, weight: 1.5, dashArray: '3 4', interactive: false }),
+    };
+  }
+  // 기체 목록이 바뀌면(제어 모드 수신) 표식을 더하거나 뺌
+  function syncAircraft() {
+    if (mapAcVer === M.acVersion) return;
+    mapAcVer = M.acVersion;
+    const ids = new Set(M.AIRCRAFT.map(a => a.id));
+    Object.keys(markers).forEach(id => {
+      if (ids.has(id)) return;
+      acLayer.removeLayer(markers[id]); trailLayer.removeLayer(trails[id]);
+      Object.values(raws[id]).forEach(l => rawLayer.removeLayer(l));
+      delete markers[id]; delete trails[id]; delete raws[id];
+    });
+    M.AIRCRAFT.forEach(ac => {
+      if (markers[ac.id]) {
+        // 같은 키의 출처가 바뀌면(예: 재생 → 실시간) 표식을 다시 만듦
+        if (markers[ac.id].options.icon.options.html.includes('mk--replay') === !!ac.replay) return;
+        acLayer.removeLayer(markers[ac.id]); trailLayer.removeLayer(trails[ac.id]);
+      }
+      addAircraft(ac);
+    });
+  }
+
   function bindControls() {
     const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
-    on('zoom-in', 'click', () => map.zoomIn());
-    on('zoom-out', 'click', () => map.zoomOut());
+    on('zoom-in', 'click', () => { ctlUserMoved = true; map.zoomIn(); });
+    on('zoom-out', 'click', () => { ctlUserMoved = true; map.zoomOut(); });
     on('btn-follow', 'click', () => S.setFollow(!S.follow));
     const lp = document.getElementById('layer-panel');
     const lb = document.getElementById('btn-layers');
@@ -174,7 +202,7 @@
         setTimeout(() => lb.classList.remove('is-hint'), 2400);
       });
     }
-    on('btn-fit', 'click', () => { S.setFollow(false); fitAll(); });
+    on('btn-fit', 'click', () => { S.setFollow(false); ctlUserMoved = false; fitAll(); });
     document.querySelectorAll('input[name="basemap"]').forEach(r => {
       r.addEventListener('change', () => setBasemap(r.value));
       if (NO_EXTERNAL_TILES && r.value !== 'grid') {
@@ -193,6 +221,16 @@
 
   // 처음 화면: 기준점(제주시청)과 가상 절차·버티포트가 모두 보이도록 맞춤
   function fitAll() {
+    if (CTL) {
+      // 제어 모드: 받은 항적 위치에 맞춤(없으면 기준 위치)
+      const ll = M.AIRCRAFT.map(a => S.recs[a.id]).filter(r => r && S.isFresh(r.id)).map(r => [r.fused.lat, r.fused.lon]);
+      if (!ll.length) { map.setView(C.MAP_CENTER, C.MAP_ZOOM); return; }
+      map.invalidateSize();
+      if (ll.length === 1) { map.setView(ll[0], 13, { animate: false }); return; }
+      // 표지는 표식 오른쪽에 붙고 지도 아래에 범례가 있으므로 오른쪽·아래 여백을 더 둠
+      map.fitBounds(L.latLngBounds(ll), { paddingTopLeft: [70, 80], paddingBottomRight: [190, 110], maxZoom: 14, animate: false });
+      return;
+    }
     const pts = [C.MAP_CENTER].concat(...M.PROCS.map(p => p.ll), M.VERTIPORTS.map(v => v.ll));
     map.fitBounds(L.latLngBounds(pts), { padding: [60, 60] });
   }
@@ -244,14 +282,21 @@
       });
     });
 
+    syncAircraft();
+    if (CTL && !ctlUserMoved) {
+      const key = M.AIRCRAFT.filter(a => S.isFresh(a.id)).map(a => a.id).sort().join(',');
+      if (key && key !== ctlFitKey && !key.split(',').every(id => ctlFitKey.split(',').includes(id))) fitAll();
+      if (key) ctlFitKey = key;
+    }
     M.AIRCRAFT.forEach(ac => {
       const r = S.recs[ac.id];
       const mk = markers[ac.id];
       const el = mk.getElement();
       if (!r) { if (el) el.style.display = 'none'; return; }
-      if (el) el.style.display = '';
       const st = S.displayStatus(ac.id);
       const fresh = st !== 'nodata';
+      if (CTL) { updateControl(ac, r, st, fresh, mk, el); return; }
+      if (el) el.style.display = '';
       mk.setLatLng([r.fused.lat, r.fused.lon]);
       mk.setZIndexOffset(ac.id === sel ? 1000 : (5 - TMS.STATUS[st].rank) * 100);
       if (el) {
@@ -286,6 +331,32 @@
     declutter();
     const fol = document.getElementById('btn-follow');
     if (fol) fol.classList.toggle('is-on', S.follow);
+  }
+
+  // 제어 모드 표식: 출처(X-Plane·ABSim·재생) 표시, 고도 m·대지속도 m/s. 정보 없음이면 표식·항적을 숨김(위치 숨김)
+  function updateControl(ac, r, st, fresh, mk, el) {
+    const sel = S.selected;
+    const tr = trails[ac.id];
+    if (!fresh) {
+      if (el) el.style.display = 'none';
+      tr.setLatLngs([]);
+      return;
+    }
+    if (el) el.style.display = '';
+    const f = r.fused;
+    mk.setLatLng([f.lat, f.lon]);
+    mk.setZIndexOffset(ac.id === sel ? 1000 : ac.replay ? 0 : 200);
+    if (el) {
+      const root = el.firstElementChild;
+      root.className = `mk mk--${st} mk--src-${ac.source}${ac.replay ? ' mk--replay' : ''}${f.hdg == null ? ' mk--nohdg' : ''}${ac.id === sel ? ' is-selected' : ''}`;
+      root.querySelector('.mk__hdg').setAttribute('transform', `rotate(${f.hdg || 0})`);
+      root.querySelector('.mk__st').textContent = SRC[ac.source] ? SRC[ac.source].label : '';
+      const alt = f.alt_m == null ? '— m' : `${Math.round(f.alt_m)} m`;
+      const gs = f.gs_ms == null ? '— m/s' : `${f.gs_ms.toFixed(1)} m/s`;
+      root.querySelector('.mk__l2').textContent = `${alt} · ${gs}${r.ext && r.ext.udp_connected === false ? ' · UDP 끊김' : ''}`;
+    }
+    tr.setLatLngs((S.trails[ac.id] || []).map(p => [p[1], p[2]]));
+    tr.setStyle({ opacity: ac.replay ? 0.3 : 0.45 });
   }
 
   // 기체 정보 표지 겹침 피하기: 화면 좌표로 표지 상자를 만들고, 겹치면 아래로 비켜 놓고 연결선을 그림

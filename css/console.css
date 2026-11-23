@@ -23,6 +23,7 @@
   --warning: #fb923c;
   --emergency: #f43f5e;
   --nodata: #8a8a8a;
+  --external: #8fb4e3; /* 제어 모드: 판정 없음(외부 항적) */
   --adsb: #e879f9;
   --tlm: #a5f3fc;
 
@@ -845,7 +846,7 @@ body.is-closed .closed-overlay { display: grid; place-items: center; position: f
   .mode--live i, .alert--emergency, .mk--emergency .mk__halo, .asset--emergency .asset__dot { animation: none; }
 }
 @media (max-width: 1500px) {
-  .statusline .chip:nth-child(n+6):not(.chip--policy):not(#chip-clock):not(#chip-backup) { display: none; }
+  .statusline .chip:nth-child(n+7):not(.chip--policy):not(#chip-clock):not(#chip-backup) { display: none; }
   body[data-view="main"] .layout { grid-template-columns: 280px minmax(0, 1fr) 360px; }
   .brand__sub, .demo-flag { display: none; }
   .map-legend { display: none; }
@@ -904,3 +905,43 @@ body.is-closed .closed-overlay { display: grid; place-items: center; position: f
   .pane-oexp .list-body { max-height: 50vh; }
   .og-overview, .pane-ograph .map-legend { display: none; }
 }
+
+/* ---------- 제어 모드(ABFAP 외부 항적) ---------- */
+/* 데이터 공급원 표시: 데모 각본과 제어 모드를 상단에서 구분함 */
+.src-badge { flex-shrink: 0; display: inline-flex; align-items: center; padding: 2px 9px; margin-right: 6px; border-radius: 2px; font-size: 11.5px; font-weight: 600; letter-spacing: .03em; }
+.src--demo { color: var(--text-2); border: 1px solid var(--line-2); }
+.src--control { color: #0b1626; background: var(--external); }
+.top-btn--control.is-on { color: #0b1626; background: var(--external); border-color: var(--external); }
+body.is-control .demo-flag i { background: var(--external); }
+/* 제어 모드에서는 판정 엔진·수신 장비·서버 상태 칩과 경로 비율을 쓰지 않음 */
+body.is-control #chip-adsb, body.is-control #chip-lora, body.is-control #chip-manet, body.is-control #chip-sig,
+body.is-control .chip--policy, body.is-control #chip-clock, body.is-control #chip-backup, body.is-control #gauges { display: none !important; }
+.st-text--external { color: var(--external); }
+.st-tag--external { color: var(--external); border-color: rgba(143, 180, 227, .45); }
+.tag--src { color: var(--external); border: 1px solid rgba(143, 180, 227, .5); }
+.tag--src-replay { color: #e2c9ff; border: 1px dashed #b892e8; }
+.asset--external .asset__dot { background: var(--external); }
+.asset--external .dia rect, .dia--external rect { stroke: var(--external); fill: rgba(143, 180, 227, .1); }
+.asset--external .dia circle, .dia--external circle { fill: var(--external); }
+.dia--replay rect { stroke-dasharray: 2 2.5; }
+.asset--replay .asset__name b { font-style: italic; }
+.ev--external td { color: var(--text-2); }
+.pm--external { background: var(--external); }
+.og-st--external { background: var(--external); }
+.og-node--external { border-left: 2px solid var(--external); }
+/* 지도 표식: 외부 항적은 판정 색을 쓰지 않음. 재생 항적은 점선·반투명으로 실시간 기체와 구분함 */
+.mk--external { color: var(--external); }
+.mk--external .mk__st { color: var(--external); font-weight: 600; }
+.mk--replay { opacity: .72; }
+.mk--replay .mk__dia { stroke-dasharray: 2.5 2.5; fill: rgba(10, 10, 10, .25); }
+.mk--replay .mk__label { border-left-style: dashed; font-style: italic; }
+.mk--replay .mk__st { color: #e2c9ff; }
+.mk--nohdg .mk__hdg { display: none; }
+.trail--replay { stroke-dasharray: 3 5; }
+.ext-note { border: 1px solid rgba(143, 180, 227, .35); border-left: 3px solid var(--external); padding: 10px 12px; background: rgba(143, 180, 227, .06); }
+.ext-note b { color: var(--external); }
+.ext-note p { margin: 6px 0 0; color: var(--text-2); font-size: 12px; }
+.lg--external { border-color: var(--external); }
+.lg--replay { border: 1.5px dashed #e2c9ff; }
+body.is-control .demo-only { display: none !important; }
+body:not(.is-control) .ctl-only { display: none !important; }

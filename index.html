@@ -7,21 +7,22 @@
 <!-- 지도 라이브러리·웹 글꼴은 vendor/에 함께 둠(오프라인판). 외부 자원은 지도 타일뿐이며, 운영 환경(망 분리)에서는 타일도 내부에 두어야 함. -->
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="css/console.css?v=f676e9a">
+<link rel="stylesheet" href="css/console.css?v=a5e4543">
 </head>
 <body data-view="main">
 
 <!-- 상단 표시줄 -->
 <header class="topbar">
-  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=f676e9a" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
+  <div class="brand"><img class="brand__logo" src="img/logo_ab.svg?v=a5e4543" alt="로고"><span class="brand__name">AAM TMS</span><span class="brand__sub">내부 관제</span></div>
   <nav class="tabs" id="tabs"></nav>
   <div class="top-right">
     <span class="screen-pos" id="screen-pos" hidden></span>
     <button type="button" class="top-btn" id="btn-multi" title="화면 역할을 모니터별로 나누어 엶">멀티모니터</button>
     <button type="button" class="top-btn top-btn--icon" id="btn-fullscreen" title="전체 화면">⛶</button>
     <button type="button" class="top-btn" id="btn-demo" title="가상 상황 주입">데모 제어</button>
+    <button type="button" class="top-btn top-btn--control" id="btn-control" aria-pressed="false">제어 모드</button>
     <div class="seg seg--sm lang-toggle" id="lang-toggle" title="표시 언어"><button type="button" data-lang="ko">KO</button><button type="button" data-lang="en">EN</button></div>
-    <span class="demo-flag"><i></i>DEMO DATA</span>
+    <span class="demo-flag" id="src-flag"><i></i>DEMO DATA</span>
     <span class="avatar" title="관제 요원(데모)">OP</span>
   </div>
 </header>
@@ -51,6 +52,7 @@
 
 <!-- 기본 상태 표시 (박스 구성은 이전 시안과 같음) -->
 <div class="statusline">
+  <span class="src-badge" id="src-badge" title="데이터 공급원"></span>
   <span class="mode-badge mode--live" id="mode-badge"><i></i>실시간</span>
   <span class="chip" id="chip-feed" title="조회 API로부터 판정 결과 수신 상태">판정 결과<b>—</b></span>
   <span class="chip" id="chip-adsb">ADS-B 수신기<b>—</b></span>
@@ -87,7 +89,8 @@
     <div class="list-summary" id="list-summary"></div>
     <div class="list-body" id="list-body"></div>
     <div class="pane-foot">
-      <span><i class="dot dot--live"></i>가상 데이터</span>
+      <span class="demo-only"><i class="dot dot--live"></i>가상 데이터</span>
+      <span class="ctl-only"><i class="dot dot--live"></i>ABFAP 수신 데이터</span>
       <span class="mono" id="foot-clock">--:--:-- UTC</span>
     </div>
   </section>
@@ -97,7 +100,8 @@
     <div class="map-wrap">
       <div id="map"></div>
       <div class="cop-chip">상황 지도</div>
-      <div class="map-note">가상 예시 절차 · 좌표 임의값</div>
+      <div class="map-note demo-only">가상 예시 절차 · 좌표 임의값</div>
+      <div class="map-note ctl-only">ABFAP 외부 항적 · 판정 없음</div>
       <div class="alert-strip" id="alert-strip"></div>
 
       <div class="map-ctl">
@@ -148,14 +152,17 @@
 
       <div class="gauges" id="gauges"></div>
       <div class="map-legend">
-        <span><i class="lg lg--normal"></i>정상</span>
-        <span><i class="lg lg--caution"></i>주의</span>
-        <span><i class="lg lg--warning"></i>경고</span>
-        <span><i class="lg lg--emergency"></i>비상</span>
-        <span><i class="lg lg--nodata"></i>정보 없음</span>
-        <span><i class="lg lg--virtual"></i>가상기체</span>
-        <span><i class="lg lg--adsb"></i>ADS-B</span>
-        <span><i class="lg lg--tlm"></i>텔레메트리</span>
+        <span class="demo-only"><i class="lg lg--normal"></i>정상</span>
+        <span class="demo-only"><i class="lg lg--caution"></i>주의</span>
+        <span class="demo-only"><i class="lg lg--warning"></i>경고</span>
+        <span class="demo-only"><i class="lg lg--emergency"></i>비상</span>
+        <span class="demo-only"><i class="lg lg--nodata"></i>정보 없음</span>
+        <span class="demo-only"><i class="lg lg--virtual"></i>가상기체</span>
+        <span class="demo-only"><i class="lg lg--adsb"></i>ADS-B</span>
+        <span class="demo-only"><i class="lg lg--tlm"></i>텔레메트리</span>
+        <span class="ctl-only"><i class="lg lg--external"></i>판정 없음(외부 항적)</span>
+        <span class="ctl-only"><i class="lg lg--replay"></i>재생 항적(실시간 아님)</span>
+        <span class="ctl-only"><i class="lg lg--nodata"></i>정보 없음(위치 숨김)</span>
       </div>
     </div>
     <div class="map-bar">
@@ -381,13 +388,14 @@
 <div class="closed-overlay">연동 창 종료 요청을 받음. 이 창은 닫아도 됨.</div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="js/config.js?v=f676e9a"></script>
-<script src="js/i18n.js?v=f676e9a"></script>
-<script src="js/mock_source.js?v=f676e9a"></script>
-<script src="js/store.js?v=f676e9a"></script>
-<script src="js/map_view.js?v=f676e9a"></script>
-<script src="js/panels.js?v=f676e9a"></script>
-<script src="js/ontology.js?v=f676e9a"></script>
-<script src="js/app.js?v=f676e9a"></script>
+<script src="js/config.js?v=a5e4543"></script>
+<script src="js/i18n.js?v=a5e4543"></script>
+<script src="js/mock_source.js?v=a5e4543"></script>
+<script src="js/abfap_source.js?v=a5e4543"></script>
+<script src="js/store.js?v=a5e4543"></script>
+<script src="js/map_view.js?v=a5e4543"></script>
+<script src="js/panels.js?v=a5e4543"></script>
+<script src="js/ontology.js?v=a5e4543"></script>
+<script src="js/app.js?v=a5e4543"></script>
 </body>
 </html>

@@ -7,7 +7,9 @@
   const $ = sel => document.querySelector(sel);
   const esc = s => F.esc(s);
   const kstMs = ms => `${F.time(ms + 9 * 3600 * 1000, true)}.${Math.floor(new Date(ms).getMilliseconds() / 100)}`;
-  const byAc = Object.fromEntries(M.AIRCRAFT.map(a => [a.id, a]));
+  // 기체 목록은 제어 모드에서 수신에 따라 바뀜
+  const acOf = id => (id ? M.AIRCRAFT.find(a => a.id === id) || null : null);
+  const CTL = !!M.control;
 
   // ---------- 정의(가상 예시) ----------
   // col: 그래프 열(왼쪽 원천 → 오른쪽 기체·시설)
@@ -30,11 +32,13 @@
     { id: 'LORA', short: 'LoRa', name: '텔레메트리 · LoRa', path: 'TELEMETRY/LORA', ep: '192.0.2.21:49000', fmt: '이진 프레임(가상)', domain: 'surv', mark: 'tlm', desc: 'LoRa 링크로 받는 기체 텔레메트리.' },
     { id: 'MANET', short: 'MANET', name: '텔레메트리 · MANET', path: 'TELEMETRY/MANET', ep: '192.0.2.31:49001', fmt: 'UDP 데이터 참조(가상)', domain: 'surv', mark: 'tlm', desc: 'MANET 지상 노드로 받는 기체 텔레메트리.' },
     { id: 'SIM', short: '가상 주입', name: '가상기체 주입', path: null, ep: '내부 주입(무선 구간 없음)', fmt: '텔레메트리와 같은 형식', domain: 'surv', mark: 'virtual', desc: '가상기체 값을 입력단에 같은 형식으로 주입함. 실기체에는 적용하지 않음.' },
+    // 제어 모드에서만 수신함. 판정 결과가 아니므로 판정 입력으로 이어지지 않음
+    { id: 'ABFAP', short: 'ABFAP', name: 'ABFAP 항적 전송(가상 예시)', path: 'ABFAP', ep: 'POST api/abfap/push(같은 출처 상대 경로)', fmt: 'JSON 스냅샷 tracks[] · 1초 주기', domain: 'surv', mark: 'external', desc: 'ABFAP가 X-Plane·ABSim·재생 항적을 1초마다 보내는 외부 항적 스냅샷. 수신기가 X-API-Key를 검증하고 최신 1건만 둠. 판정 결과가 아니며 판정 입력으로 쓰지 않음(판정 없음). 제어 모드에서만 수신함.' },
     { id: 'FPL', short: '운항 배정', name: '운항 배정', path: null, ep: null, fmt: '운항 배정 파일(가상)', domain: 'ops', desc: '운항 배정, 노선, 기체별 텔레메트리 링크 구성.' },
     { id: 'POLICY', short: '정책', name: '절차·정책 데이터', path: null, ep: 'POL-가상-0.3', fmt: '정책 데이터(가상)', domain: 'ops', desc: '절차 형상과 판정 한계값. 판정 엔진이 사용함.' },
     { id: 'ENGINE', short: '판정 엔진', name: '판정 엔진(조회 API)', path: null, ep: '조회 API(모사)', fmt: '상태 JSON', domain: 'verdict', desc: '판정 결과를 내는 외부 기능. 화면은 결과를 표시만 함.' },
   ];
-  const SENSORS = ['ADSB', 'LORA', 'MANET', 'SIM'];
+  const SENSORS = ['ADSB', 'LORA', 'MANET', 'SIM', 'ABFAP'];
   const srcById = Object.fromEntries(SOURCES.map(s => [s.id, s]));
 
   // 공통 파라미터. v: 조회 API 기록에서 물리량을 꺼내는 이름
@@ -47,9 +51,16 @@
     { id: 'heading_deg', key: 'hdg', name: '방위', unit: 'deg', dtype: 'float32', v: 'hdg' },
     { id: 'received_utc_ms', key: 't', name: '수신 시각', unit: 'UTC ms', dtype: 'int64', v: 't_last', domain: 'comm' },
     { id: 'signature_state', key: 'sig', name: '서명 검증 결과', unit: '—', dtype: 'enum', domain: 'comm' },
+    // ABFAP 항적 전송(제어 모드)용 공통 파라미터: SI 단위로 변환한 값과 기체 키·출처·수신 상태
+    { id: 'altitude_msl_m', key: 'altm', name: '고도(MSL, m)', unit: 'm', dtype: 'float32', v: 'alt_m' },
+    { id: 'ground_speed_mps', key: 'gsm', name: '대지속도(m/s)', unit: 'm/s', dtype: 'float32', v: 'gs_ms' },
+    { id: 'measured_utc_ns', key: 'tns', name: '측정 시각(ns)', unit: 'UTC ns', dtype: 'int64', v: 'ts_ms', domain: 'comm' },
+    { id: 'aircraft_key', key: 'key', name: '기체 키', unit: '—', dtype: 'string', domain: 'ops' },
+    { id: 'track_source', key: 'src', name: '항적 출처', unit: '—', dtype: 'enum', domain: 'ops' },
+    { id: 'info_state', key: 'info', name: '수신 상태(정보 없음)', unit: '—', dtype: 'enum', domain: 'comm' },
   ];
   const parByKey = Object.fromEntries(PARAMS.map(p => [p.key, p]));
-  const RULE_NAME = { lat: '위도', lon: '경도', alt: '고도', gs: '대지속도', vs: '수직속도', hdg: '방위', t: '수신 시각' };
+  const RULE_NAME = { lat: '위도', lon: '경도', alt: '고도', gs: '대지속도', vs: '수직속도', hdg: '방위', t: '수신 시각', altm: '고도 ft→m', gsm: '속도 kt→m/s', tns: '시각 초→ns', key: '기체 키', src: '출처 구분', info: '정보 없음 기준' };
 
   // 원천별 필드와 변환식(가상 예시). [원천 필드, 원천 단위, 변환식, k, b] → 공통 값 = 원천 값 × k + b
   const R2D = 180 / Math.PI;
@@ -74,6 +85,16 @@
       lat: ['lat', 'deg', 'value', 1], lon: ['lon', 'deg', 'value', 1], alt: ['alt_ft', 'ft', 'value', 1],
       gs: ['gs_kt', 'kt', 'value', 1], vs: ['vs_fpm', 'fpm', 'value', 1], hdg: ['hdg', 'deg', 'value', 1], t: ['t', 'UTC ms', 'value', 1],
     },
+    // ABFAP 항적 전송(docs/ABFAP_Track_Push_Interface.md 3-3). 6번째 칸 'map'은 수치 변환이 아닌 대응 규칙
+    ABFAP: {
+      lat: ['tracks[].lat', 'deg', 'value', 1], lon: ['tracks[].lon', 'deg', 'value', 1], hdg: ['tracks[].heading', 'deg', 'value', 1],
+      t: ['received_at(수신기)', 'UTC ms', 'value', 1],
+      altm: ['tracks[].alt_ft', 'ft', 'value * 0.3048', 0.3048], gsm: ['tracks[].speed_kt', 'kt', 'value * 1852 / 3600', 1852 / 3600],
+      tns: ['tracks[].ts', 'Unix s', 'value * 1e9', 1e9],
+      key: ['tracks[].callsign · model', '—', 'callsign ?? model', null, 0, 'map'],
+      src: ['tracks[].source', '—', 'xplane | absim | replay', null, 0, 'map'],
+      info: ['received_at 경과', 'ms', '경과 > 2000 ms → 정보 없음', null, 0, 'map'],
+    },
   };
 
   // 관측 이후 노드: [식별자, 유형, 이름, 정의 이름, 도메인, 설명, [[상위 노드, 관계, 기수], ...]]
@@ -86,6 +107,9 @@
       [['par.received_utc_ms', 'belongsTo', 'N:1']]],
     ['obs.signature', 'obs', '서명 검증 관측', 'signature_observation', 'comm', '서명 검증에 실패한 메시지는 표시하지 않고 폐기하며 횟수만 남김.',
       [['par.signature_state', 'belongsTo', 'N:1']]],
+    ['obs.external', 'obs', '외부 항적 관측', 'external_track_observation', 'surv', 'ABFAP가 보낸 외부 항적(제어 모드). 판정 결과가 아니므로 판정 입력으로 이어지지 않으며 화면은 "판정 없음(외부 항적)"으로 표시함. 기체 키는 callsign(없으면 model)이고 ABFAP에는 ICAO 24비트 주소가 없음. 출처 replay는 현재 시각으로 옮긴 재생 항적임. 마지막 유효 수신 후 2초(제어 모드 기준)가 지나면 정보 없음.',
+      [['par.latitude_deg', 'belongsTo', 'N:1'], ['par.longitude_deg', 'belongsTo', 'N:1'], ['par.altitude_msl_m', 'belongsTo', 'N:1'], ['par.ground_speed_mps', 'belongsTo', 'N:1'],
+        ['par.heading_deg', 'belongsTo', 'N:1'], ['par.measured_utc_ns', 'timestamps', 'N:1'], ['par.aircraft_key', 'identifies', 'N:1'], ['par.track_source', 'classifies', 'N:1'], ['par.info_state', 'qualifies', 'N:1']]],
     ['in.deviation', 'input', '경로 이탈', 'route_deviation', 'verdict', '절차 경로와의 거리. 판정은 판정 엔진이 수행함.',
       [['obs.position', 'inputOf', 'N:N'], ['src.POLICY', 'limits', '1:N']]],
     ['in.speed', 'input', '구간 속도 초과', 'speed_limit', 'verdict', '구간별 속도 한계와의 비교. 판정은 판정 엔진이 수행함.',
@@ -99,7 +123,7 @@
     ['in.redundancy', 'input', '링크 이중화', 'link_redundancy', 'verdict', '운항 배정 링크 구성 대비 수신 링크. 구성 미지정이면 판단하지 않음.',
       [['obs.link', 'inputOf', 'N:N'], ['src.FPL', 'configures', '1:N']]],
     ['ev.observation', 'event', '기체 관측', 'flight_observation', 'surv', '관측을 시각과 원천 기준으로 비행에 연결함.',
-      [['obs.position', 'belongsTo', 'N:1'], ['obs.motion', 'belongsTo', 'N:1'], ['obs.link', 'belongsTo', 'N:1'], ['obs.signature', 'belongsTo', 'N:1']]],
+      [['obs.position', 'belongsTo', 'N:1'], ['obs.motion', 'belongsTo', 'N:1'], ['obs.link', 'belongsTo', 'N:1'], ['obs.signature', 'belongsTo', 'N:1'], ['obs.external', 'belongsTo', 'N:1']]],
     ['ev.verdict', 'event', '판정 결과 기록', 'verdict_result', 'verdict', '판정 엔진의 상태·사유·항목. 화면은 표시만 함.',
       [['src.ENGINE', 'produces', '1:N'], ['in.deviation', 'evaluatedBy', 'N:1'], ['in.speed', 'evaluatedBy', 'N:1'], ['in.descent', 'evaluatedBy', 'N:1'],
         ['in.mismatch', 'evaluatedBy', 'N:1'], ['in.loss', 'evaluatedBy', 'N:1'], ['in.redundancy', 'evaluatedBy', 'N:1']]],
@@ -113,8 +137,8 @@
       [['src.FPL', 'defines', '1:N']]],
     ['fl.procedure', 'flight', '절차', 'procedure', 'ops', '출항·입항·공중대기 절차와 구간.',
       [['src.POLICY', 'defines', '1:N']]],
-    ['en.aircraft', 'entity', '기체', 'aircraft', 'ops', '실기체와 가상기체.',
-      [['fl.flight', 'operatedBy', 'N:1']]],
+    ['en.aircraft', 'entity', '기체', 'aircraft', 'ops', '실기체와 가상기체. 제어 모드의 ABFAP 외부 항적은 ICAO 24비트 주소가 없어 callsign(없으면 model)을 기체 키로 씀.',
+      [['fl.flight', 'operatedBy', 'N:1'], ['par.aircraft_key', 'identifies', 'N:1']]],
     ['en.vertiport', 'entity', '버티포트', 'vertiport', 'ops', '이착륙장. 한 번에 한 대만 이착륙함.',
       [['fl.schedule', 'uses', 'N:1'], ['fl.procedure', 'serves', 'N:1']]],
     ['en.operator', 'entity', '관제 요원', 'operator', 'ops', '경보 확인과 병행 운용 기록의 주체.',
@@ -140,13 +164,14 @@
     const id = `rule.${src}.${p.key}`;
     addNode({
       id, type: 'rule', name: `${srcById[src].short} · ${RULE_NAME[p.key]}`, key: `${src.toLowerCase()}_${p.key}`, sub: f[0], domain: p.domain || 'surv',
-      src, pkey: p.key, field: f[0], srcUnit: f[1], formula: f[2], k: f[3], b: f[4] || 0, unit: p.unit, dtype: p.dtype,
+      src, pkey: p.key, field: f[0], srcUnit: f[1], formula: f[2], k: f[3], b: f[4] || 0, kind: f[5] || 'num', unit: p.unit, dtype: p.dtype,
       desc: `원천 필드를 공통 파라미터로 변환함: ${f[0]} → ${p.id}`,
     });
     addEdge(`src.${src}`, id, 'feeds', '1:N');
     addEdge(id, `par.${p.id}`, 'mapsTo', 'N:1');
   }));
-  SENSORS.forEach(src => addEdge(`src.${src}`, 'par.signature_state', 'verifiedBy', 'N:1'));
+  // ABFAP 항적에는 메시지 서명이 없음(수신기가 X-API-Key만 검증함)
+  SENSORS.filter(src => src !== 'ABFAP').forEach(src => addEdge(`src.${src}`, 'par.signature_state', 'verifiedBy', 'N:1'));
   DERIVED.forEach(([id, type, name, key, domain, desc, parents]) => {
     addNode({ id, type, name, key, sub: key, domain, desc, dtype: 'object', unit: '—' });
     parents.forEach(([from, rel, card]) => addEdge(from, id, rel, card));
@@ -239,11 +264,12 @@
   }
 
   // ---------- 실시간 값 ----------
-  const refAc = () => (O.ac && byAc[O.ac] ? O.ac : S.selected && byAc[S.selected] ? S.selected : M.AIRCRAFT[0].id);
+  const refAc = () => (acOf(O.ac) ? O.ac : acOf(S.selected) ? S.selected : M.AIRCRAFT[0] ? M.AIRCRAFT[0].id : null);
   // 원천별 경로 값(공통 단위의 물리량). ADS-B·텔레메트리 경로 기록에는 위치·고도만 있으므로 속도·방위는 융합 값을 씀(시안)
   function sample(src, acId) {
-    const r = S.recs[acId];
-    const ac = byAc[acId];
+    const r = acId ? S.recs[acId] : null;
+    const ac = acOf(acId);
+    if (!ac) return { state: 'none' };
     if (src === 'SIM' && !ac.virtual) return { state: 'na' };
     if (!r || !r.fused) return { state: 'none' };
     const fz = { gs_kt: r.fused.gs_kt, vs_fpm: r.fused.vs_fpm, hdg: r.fused.hdg };
@@ -255,6 +281,8 @@
   const sampleStale = (s, acId) => S.feedStale() || S.displayStatus(acId) === 'nodata' || TMS.isStale(S.now - s.t_last);
 
   function srcLive(id) {
+    if (id === 'ABFAP' && !CTL) return { cls: 'na', text: '제어 모드에서만 수신' };
+    if (CTL && (id === 'ENGINE' || id === 'POLICY' || id === 'FPL')) return { cls: 'na', text: '제어 모드: 쓰지 않음' };
     if (S.feedStale()) return { cls: 'nodata', text: '정보 없음' };
     if (SENSORS.includes(id)) {
       let n = 0, m = 0;
@@ -278,7 +306,7 @@
     return { cls: 'na', text: '정의됨' };
   };
 
-  const DIGITS = { lat: 6, lon: 6, alt: 0, gs: 1, vs: 0, hdg: 1 };
+  const DIGITS = { lat: 6, lon: 6, alt: 0, gs: 1, vs: 0, hdg: 1, altm: 1, gsm: 2 };
   function fmtRaw(n, raw) {
     if (n.pkey === 't') return String(Math.round(raw));
     if (n.srcUnit === 'rad') return raw.toFixed(8);
@@ -288,13 +316,38 @@
   }
   const fmtOut = (key, v) => (key === 't' ? kstMs(v) : v.toFixed(DIGITS[key]));
   // 데이터 미리보기 한 줄: 원천 값(공통 값을 역변환해 만든 모사 값)과 변환 결과
+  // ABFAP 대응 규칙(기체 키·출처·정보 없음)과 시각 초→ns 변환. 값은 수신한 원천 값 그대로임(역변환 모사 아님)
+  const SRC_LABEL = { xplane: 'X-Plane 실시간', absim: 'ABSim 실시간', replay: '재생(실시간 아님)' };
+  function abfapValue(n, s, acId) {
+    if (n.pkey === 'info') {
+      const ms = Math.max(0, Math.round(S.now - s.t_last));
+      return { inV: `${ms} ms`, outV: TMS.isStale(ms) ? '정보 없음' : '유효' };
+    }
+    if (n.pkey === 'key') return { inV: `callsign=${s.callsign ?? 'null'} · model=${s.model ?? 'null'}`, outV: `${acId} (${s.keyFrom})` };
+    if (n.pkey === 'src') return { inV: s.source || '—', outV: SRC_LABEL[s.source] || '—' };
+    if (n.pkey === 'tns') {
+      if (s.ts_ms == null) return null;
+      return { inV: (s.ts_ms / 1000).toFixed(3), outV: (BigInt(Math.round(s.ts_ms)) * 1000000n).toString() };
+    }
+    return null;
+  }
   function previewRow(n, acId) {
     const s = sample(n.src, acId);
     const p = parByKey[n.pkey];
     if (s.state === 'na') return { st: '<span class="st-text--na">미적용</span>', inV: '—', outV: '—', at: '—', age: '—' };
     if (s.state === 'none') return { st: '<span class="st-text--na">수신 이력 없음</span>', inV: '—', outV: '—', at: '—', age: '—' };
     const age = `${Math.max(0, (S.now - s.t_last) / 1000).toFixed(1)}초`;
+    if (n.src === 'ABFAP' && n.pkey === 'info') {
+      const v = abfapValue(n, s, acId);
+      const stale = sampleStale(s, acId);
+      return { st: stale ? '<span class="st-tag st-tag--nodata">정보 없음</span>' : '<span class="st-text st-text--normal">수신</span>', inV: v.inV, outV: v.outV, at: kstMs(s.t_last), age };
+    }
     if (sampleStale(s, acId)) return { st: '<span class="st-tag st-tag--nodata">정보 없음</span>', inV: '—', outV: '—', at: kstMs(s.t_last), age };
+    if (n.src === 'ABFAP' && (n.kind === 'map' || n.pkey === 'tns')) {
+      const v = abfapValue(n, s, acId);
+      if (!v) return { st: '<span class="st-text--na">값 없음</span>', inV: '—', outV: '—', at: kstMs(s.t_last), age };
+      return { st: '<span class="st-text st-text--normal">수신</span>', inV: esc(v.inV), outV: esc(v.outV), at: kstMs(s.t_last), age };
+    }
     const phys = s[p.v];
     if (phys == null || !isFinite(phys)) return { st: '<span class="st-text--na">값 없음</span>', inV: '—', outV: '—', at: kstMs(s.t_last), age };
     const raw = (phys - n.b) / n.k;
@@ -594,14 +647,15 @@
     $('#og-valid-n').textContent = warnCount;
     $('#og-valid-n').hidden = !warnCount;
     const ac = refAc();
+    syncAcOptions();
     const selA = $('#og-ac');
-    if (selA.value !== ac) selA.value = ac;
+    if (ac && selA.value !== ac) selA.value = ac;
     const n = O.sel ? byId[O.sel] : null;
     const sub = $('#og-dsub');
     const body = $('#og-dbody');
     if (O.dtab === 'preview') {
       const rules = previewRules();
-      sub.innerHTML = `<span><b>${esc(n ? n.name : '전체 변환 규칙')}</b> / 원천별 입력 · 기준 기체 <b class="mono">${ac}</b></span><span>공통 단위로 변환해 표시 · 마지막 유효 수신 후 1초가 지나면 정보 없음</span>`;
+      sub.innerHTML = `<span><b>${esc(n ? n.name : '전체 변환 규칙')}</b> / 원천별 입력 · 기준 기체 <b class="mono">${ac ? esc(ac) : '없음'}</b>${CTL ? ' · 제어 모드(ABFAP 수신 값)' : ''}</span><span>공통 단위로 변환해 표시 · 마지막 유효 수신 후 ${(TMS.staleMs() / 1000).toFixed(0)}초가 지나면 정보 없음</span>`;
       body.innerHTML = rules.length ? `<table class="tbl tbl--og tbl--preview"><thead><tr><th>원천</th><th>입력 단자</th><th>원천 필드</th><th class="r">입력 값</th><th>단위</th><th>변환식</th><th>공통 필드</th><th class="r">출력 값</th><th>단위</th><th>상태</th><th>수신 시각</th><th class="r">경과</th></tr></thead><tbody>
         ${rules.map(r => `<tr data-rule="${r.id}" data-go="${r.id}" class="og-click${r.id === O.sel ? ' is-selected' : ''}">
           <td>${esc(srcById[r.src].short)}</td><td class="mono muted">${esc(srcById[r.src].ep || '미지정')}</td><td class="mono">${esc(r.field)}</td>
@@ -613,7 +667,7 @@
       sub.innerHTML = '<span><b>파라미터 매핑</b> / 공통 파라미터 × 원천</span><span>원천 필드 · 변환식(가상 예시)</span>';
       body.innerHTML = `<table class="tbl tbl--og"><thead><tr><th>공통 파라미터</th><th>단위</th>${SENSORS.map(s => `<th>${esc(srcById[s].short)}</th>`).join('')}</tr></thead><tbody>
         ${PARAMS.filter(p => p.key !== 'sig').map(p => `<tr><td><b>${esc(p.name)}</b><small class="mono">${p.id}</small></td><td class="mono muted">${esc(p.unit)}</td>
-          ${SENSORS.map(s => { const r = byId[`rule.${s}.${p.key}`]; return `<td data-go="${r.id}" class="og-click og-map${r.id === O.sel ? ' is-selected' : ''}"><span class="mono">${esc(r.field)}</span><small class="mono">${esc(r.formula)}</small></td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
+          ${SENSORS.map(s => { const r = byId[`rule.${s}.${p.key}`]; if (!r) return '<td class="muted">—</td>'; return `<td data-go="${r.id}" class="og-click og-map${r.id === O.sel ? ' is-selected' : ''}"><span class="mono">${esc(r.field)}</span><small class="mono">${esc(r.formula)}</small></td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
     } else if (O.dtab === 'rels') {
       const list = EDGES.filter(e => O.vis.has(e.from) && O.vis.has(e.to) && (!O.lin || edgeLit(e, O.lin)));
       sub.innerHTML = `<span><b>관계</b> / ${n ? `${esc(n.name)} 계보` : '전체'}</span><span>${list.length}개</span>`;
@@ -812,8 +866,17 @@
     });
   }
 
+  // 기준 기체 고르기: 제어 모드에서는 수신에 따라 목록이 바뀜
+  let ogAcVer = -1;
+  function syncAcOptions() {
+    if (ogAcVer === M.acVersion) return;
+    ogAcVer = M.acVersion;
+    const sel = $('#og-ac');
+    const tag = a => (a.virtual ? ' (가상)' : a.replay ? ' (재생)' : a.source && M.SOURCES ? ` (${M.SOURCES[a.source].label})` : '');
+    sel.innerHTML = M.AIRCRAFT.length ? M.AIRCRAFT.map(a => `<option value="${esc(a.id)}">${esc(a.id)}${tag(a)}</option>`).join('') : '<option value="">수신 항적 없음</option>';
+  }
   function build() {
-    $('#og-ac').innerHTML = M.AIRCRAFT.map(a => `<option value="${a.id}">${a.id}${a.virtual ? ' (가상)' : ''}</option>`).join('');
+    syncAcOptions();
     $('#og-source').innerHTML = `<option value="all">전체 원천</option>${SENSORS.map(s => `<option value="${s}">${esc(srcById[s].name)}</option>`).join('')}`;
     $('#og-domain').innerHTML = `<option value="all">전체 도메인</option>${Object.entries(DOMAINS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}`;
     $('#og-n-graph').textContent = EDGES.length;

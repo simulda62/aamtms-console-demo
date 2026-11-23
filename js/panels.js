@@ -2,7 +2,21 @@
 (function () {
   const C = TMS.config, S = TMS.state, M = TMS.mock, F = TMS.fmt, ST = TMS.STATUS;
   const $ = sel => document.querySelector(sel);
-  const byId = Object.fromEntries(M.AIRCRAFT.map(a => [a.id, a]));
+  // 기체 목록은 제어 모드에서 수신에 따라 늘고 줄어듦(데모 각본은 고정)
+  const acOf = id => M.AIRCRAFT.find(a => a.id === id) || null;
+  // 제어 모드(ABFAP 항적): 판정 없음(외부 항적), 단위 m·m/s, 출처(X-Plane·ABSim·재생) 구분
+  const CTL = !!M.control;
+  const SRC = M.SOURCES || {};
+  const fmtM = v => (v == null ? '—' : `${Math.round(v).toLocaleString()} m`);
+  const fmtMps = v => (v == null ? '—' : `${v.toFixed(1)} m/s`);
+  const fmtDeg = v => (v == null ? '—' : `${Math.round(v)}°`);
+  const srcTag = a => (a && SRC[a.source] ? `<em class="tag tag--src tag--src-${a.source}">${SRC[a.source].label}</em>` : '');
+  const ST_KEYS = CTL ? ['nodata', 'external'] : ['emergency', 'warning', 'nodata', 'caution', 'normal'];
+  const CTL_PHASE = {
+    ok: ['ok', '정상'], nodata: ['nodata', '수신 이력 없음'], silent: ['warn', 'ABFAP 전송 없음'],
+    lost: ['bad', '연결 끊김'], none: ['nodata', '수신기 없음'], connecting: ['nodata', '연결 중'],
+  };
+  const ctlStatus = () => (CTL ? M.status() : null);
   const kst = ms => F.time(ms + 9 * 3600 * 1000, true);
   const kstMs = ms => `${kst(ms)}.${Math.floor(new Date(ms).getMilliseconds() / 100)}`;
   const ago = ms => F.age(ms).replace(' 전', '');
@@ -24,7 +38,7 @@
   const kv = rows => rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
 
   function counts() {
-    const c = { emergency: 0, warning: 0, nodata: 0, caution: 0, normal: 0 };
+    const c = { emergency: 0, warning: 0, nodata: 0, caution: 0, normal: 0, external: 0 };
     M.AIRCRAFT.forEach(a => { c[S.displayStatus(a.id)]++; });
     return c;
   }
@@ -72,7 +86,22 @@
     const bad = S.feedStale();
     const rx = S.receivers || {};
     const sig = S.mode === 'live' && S.sigCount.lastFail && Date.now() - S.sigCount.lastFail < SIG_RECENT_MS;
-    setChip('chip-feed', bad ? 'bad' : 'ok', bad ? '두절' : '정상');
+    const sb = $('#src-badge');
+    sb.className = `src-badge ${CTL ? 'src--control' : 'src--demo'}`;
+    sb.textContent = CTL ? '제어 모드 · ABFAP 항적' : '데모 · 가상 각본';
+    const flag = $('#src-flag').lastChild, flagText = CTL ? 'ABFAP TRACKS' : 'DEMO DATA';
+    if (flag.nodeValue !== flagText) flag.nodeValue = flagText;
+    if (CTL) {
+      // 제어 모드: 판정 결과 대신 ABFAP 수신기 연결 상태. 수신기·판정 엔진 관련 칩은 숨김(console.css)
+      const cs = ctlStatus();
+      const [cls, txt] = CTL_PHASE[cs.phase] || CTL_PHASE.none;
+      const chip = $('#chip-feed');
+      const label = TMS.i18n.t('ABFAP 수신기');
+      if (chip.firstChild.nodeType === 3 && chip.firstChild.nodeValue !== label) chip.firstChild.nodeValue = label;
+      setChip('chip-feed', cls, txt);
+      const n = cs.snap ? cs.snap.counts : null;
+      chip.title = TMS.i18n.t(`ABFAP 항적 전송 수신기(같은 출처 ${C.CONTROL_SNAPSHOT_URL})${n ? ` · 마지막 스냅샷 X-Plane ${n.xplane} · ABSim ${n.absim} · 재생 ${n.replay}` : ''}`);
+    } else setChip('chip-feed', bad ? 'bad' : 'ok', bad ? '두절' : '정상');
     setChip('chip-adsb', bad ? 'nodata' : rx.adsb === 'ok' ? 'ok' : 'bad', bad ? '정보 없음' : rx.adsb === 'ok' ? '정상' : '이상');
     setChip('chip-lora', bad ? 'nodata' : rx.lora === 'ok' ? 'ok' : 'bad', bad ? '정보 없음' : rx.lora === 'ok' ? '정상' : '이상');
     setChip('chip-manet', bad ? 'nodata' : rx.manet === 'ok' ? 'ok' : 'bad', bad ? '정보 없음' : rx.manet === 'ok' ? '정상' : '이상');
@@ -100,8 +129,8 @@
     if (cs) {
       let txt, cls;
       if (S.mode === 'replay') { txt = `재생 중 · 실시간 아님 · ${kst(S.now)} KST`; cls = 'is-replay'; }
-      else if (bad) { txt = `판정 결과 수신 두절 · 마지막 ${kst(S.feed.lastOk)} KST`; cls = 'is-bad'; }
-      else { txt = '실시간 연결'; cls = 'is-ok'; }
+      else if (bad) { txt = CTL ? `ABFAP 수신기 연결 끊김 · 마지막 ${S.feed.lastOk ? `${kst(S.feed.lastOk)} KST` : '—'}` : `판정 결과 수신 두절 · 마지막 ${kst(S.feed.lastOk)} KST`; cls = 'is-bad'; }
+      else { txt = CTL ? 'ABFAP 항적 수신 중 · 판정 없음' : '실시간 연결'; cls = 'is-ok'; }
       cs.className = `map-bar__right ${cls}`;
       cs.textContent = txt;
     }
@@ -175,15 +204,15 @@
   let listOrder = '';
   let listFilter = 'all';
   let query = '';
-  function buildList() {
+  function addRow(ac) {
     const body = $('#list-body');
-    M.AIRCRAFT.forEach(ac => {
+    {
       const row = document.createElement('div');
       row.className = 'asset';
       row.dataset.id = ac.id;
-      row.innerHTML = `<span class="asset__icon">${diamond(ac.virtual ? 'dia--virtual' : '')}</span>
+      row.innerHTML = `<span class="asset__icon">${diamond(ac.virtual ? 'dia--virtual' : ac.replay ? 'dia--replay' : '')}</span>
         <span class="asset__body">
-          <span class="asset__name"><b>${ac.id}</b>${ac.virtual ? '<em class="tag tag--virtual">가상</em>' : '<em class="tag tag--real">실기체</em>'}</span>
+          <span class="asset__name"><b>${F.esc(ac.id)}</b>${CTL ? srcTag(ac) : ac.virtual ? '<em class="tag tag--virtual">가상</em>' : '<em class="tag tag--real">실기체</em>'}</span>
           <small class="asset__st"></small>
           <small class="asset__proc"></small>
           <small class="asset__note"></small>
@@ -194,7 +223,26 @@
       row.addEventListener('click', () => S.select(S.selected === ac.id ? null : ac.id));
       rows[ac.id] = row;
       body.appendChild(row);
-    });
+    }
+  }
+  // 제어 모드: 수신으로 새로 생긴 기체는 줄을 더하고, 내려간 기체는 줄을 뺌
+  let listAcVer = -1;
+  function syncRows() {
+    if (listAcVer === M.acVersion) return;
+    listAcVer = M.acVersion;
+    const ids = new Set(M.AIRCRAFT.map(a => a.id));
+    Object.keys(rows).forEach(id => { if (!ids.has(id)) { rows[id].remove(); delete rows[id]; } });
+    M.AIRCRAFT.forEach(a => { if (!rows[a.id]) addRow(a); });
+    listOrder = '';
+  }
+  function buildList() {
+    syncRows();
+    if (CTL) {
+      // 제어 모드: 실기체·가상기체 구분 대신 실시간(X-Plane·ABSim)·재생 구분
+      const fb = f => document.querySelector(`#list-filter [data-f="${f}"]`);
+      fb('real').textContent = '실시간';
+      fb('virtual').textContent = '재생';
+    }
     $('#asset-search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); });
     document.querySelectorAll('#list-filter button').forEach(b => b.addEventListener('click', () => {
       listFilter = b.dataset.f;
@@ -204,6 +252,7 @@
     $('#btn-assets').addEventListener('click', () => document.body.classList.toggle('assets-closed'));
   }
   function updateList() {
+    syncRows();
     const order = sortedAircraft();
     let shown = 0;
     order.forEach(({ ac, st }) => {
@@ -214,10 +263,27 @@
       const stEl = row.querySelector('.asset__st');
       stEl.className = `asset__st st-text--${st}`;
       stEl.textContent = fresh && st !== 'normal' && r.cause ? `${ST[st].label} · ${r.cause}` : ST[st].label;
-      row.querySelector('.asset__proc').textContent = `${ac.type} · ${fresh ? r.proc.label : '—'}`;
       const notes = [];
       if (!fresh) notes.push(r ? `마지막 수신 ${kst(r.t)} (${F.age(S.now - r.t)})` : '수신 이력 없음');
       if (sigRecent(ac.id)) notes.push('서명 검증 실패 메시지 폐기');
+      if (CTL) {
+        // 제어 모드: 출처·키 근거, 고도 m, 대지속도 m/s, 방위. 정보 없음이면 값을 숨김
+        const x = r && r.ext;
+        row.querySelector('.asset__proc').textContent = `${ac.type}${x ? ` · ${x.keyFrom === 'callsign' ? 'callsign' : 'model'} 키` : ''}`;
+        if (fresh && x && x.udp_connected === false) notes.push('ABSim 텔레메트리 3초 넘게 미수신(udp_connected=false)');
+        if (ac.replay) notes.push('재생 항적 · 실시간 기체 아님');
+        row.querySelector('.asset__note').textContent = notes.join(' · ');
+        row.querySelector('.n-alt').textContent = fresh ? fmtM(r.fused.alt_m) : '—';
+        row.querySelector('.n-gs').textContent = fresh ? fmtMps(r.fused.gs_ms) : '—';
+        row.querySelector('.n-vs').textContent = fresh ? fmtDeg(r.fused.hdg) : '—';
+        row.querySelector('.asset__paths').innerHTML = `<span class="path path--${fresh ? 'ok' : 'nodata'}" title="ABFAP ${ac.source ? SRC[ac.source].label : ''}">${ac.source ? SRC[ac.source].short : '?'}</span>`;
+        row.classList.toggle('asset--replay', !!ac.replay);
+        const hay = `${ac.id} ${ac.type} ${ac.model || ''} ${ac.source ? SRC[ac.source].label : ''}`.toLowerCase();
+        row.hidden = (listFilter === 'real' && ac.replay) || (listFilter === 'virtual' && !ac.replay) || (!!query && !hay.includes(query));
+        if (!row.hidden) shown++;
+        return;
+      }
+      row.querySelector('.asset__proc').textContent = `${ac.type} · ${fresh ? r.proc.label : '—'}`;
       row.querySelector('.asset__note').textContent = notes.join(' · ');
       row.querySelector('.n-alt').textContent = fresh ? `${Math.round(r.fused.alt_ft)} ft` : '—';
       row.querySelector('.n-gs').textContent = fresh ? `${Math.round(r.fused.gs_kt)} kt` : '—';
@@ -237,11 +303,12 @@
     const c = counts();
     const bad = S.feedStale();
     $('#list-summary').innerHTML = `<span class="sum-state"><i class="dot ${bad ? 'dot--bad' : 'dot--live'}"></i>${bad ? '수신 두절' : '수신 중'}</span>`
-      + ['emergency', 'warning', 'nodata', 'caution', 'normal'].map(k => `<span class="sum${c[k] ? '' : ' is-zero'}"><span class="st-text--${k}">${ST[k].label}</span> <b>${c[k]}</b></span>`).join('');
+      + ST_KEYS.map(k => `<span class="sum${c[k] ? '' : ' is-zero'}"><span class="st-text--${k}">${ST[k].label}</span> <b>${c[k]}</b></span>`).join('');
   }
 
   // ---------- 기체 상세 ----------
   let forId;
+  let builtMissing = false; // 선택 기체가 목록에 없을 때 만든 상세(수신되면 다시 만듦)
   let showStale = false;
   let opChoice = null;
   let opRendered = -1;
@@ -294,6 +361,17 @@
     showStale = false;
     opChoice = null;
     opRendered = -1;
+    if (!forId && CTL) {
+      root.innerHTML = `<div class="d-head">
+          <div class="eyebrow">상황 개요 · 제어 모드</div>
+          <h1>항적 <span data-k="ov-n"></span>건</h1>
+          <div class="d-status" data-k="ov-status"></div>
+          <div class="d-meta" data-k="ov-meta"></div>
+        </div>
+        <div class="d-body">${section('ov', '수신 요약', '<dl class="kv2" data-k="ov-body"></dl>')}
+        <p class="d-hint">ABFAP가 보낸 외부 항적을 표시함. 판정 결과가 아니므로 판정 단계 없이 '판정 없음(외부 항적)'으로 구분함. 기체 키는 callsign(없으면 model)임(ABFAP에는 ICAO 24비트 주소가 없음).</p></div>`;
+      return;
+    }
     if (!forId) {
       root.innerHTML = `<div class="d-head">
           <div class="eyebrow">상황 개요</div>
@@ -305,7 +383,33 @@
         <p class="d-hint">목록·지도에서 기체를 선택하거나 ↑/↓ 키로 이동하면 판정 근거, 수신 경로, 절차·구간, 판정 버전, 병행 운용 기록을 표시함.</p></div>`;
       return;
     }
-    const ac = byId[forId];
+    const ac = acOf(forId);
+    builtMissing = !ac;
+    if (!ac) {
+      // 제어 모드: 다른 창에서 고른 항적이 이 창에 아직 수신되지 않았거나, 오래 수신되지 않아 목록에서 내려간 경우
+      root.innerHTML = `<div class="d-head"><div class="eyebrow">선택 항적</div><h1>${F.esc(forId)}</h1>
+        <div class="d-meta">이 창의 목록에 없음(아직 수신되지 않았거나 ${C.CONTROL_DROP_SEC}초 넘게 수신되지 않아 내려감)</div>
+        <div class="d-actions"><button type="button" class="btn btn--sm" data-act="unselect">선택 해제</button></div></div>`;
+      return;
+    }
+    if (CTL) {
+      root.innerHTML = `<div class="d-head">
+          <div class="eyebrow">ABFAP 외부 항적</div>
+          <h1>${F.esc(ac.id)}</h1>
+          <div class="d-status" data-k="status"></div>
+          <div class="d-meta" data-k="meta"></div>
+          <div class="d-paths" data-k="pathicon"></div>
+          <div class="d-actions"><button type="button" class="btn btn--sm" data-act="follow" data-k="follow">지도에서 따라가기</button><button type="button" class="btn btn--sm" data-act="unselect">선택 해제</button></div>
+        </div>
+        <div class="d-body">
+          ${section('data', '항적 데이터 <small>ABFAP 값을 m·m/s로 변환</small>', '<dl class="kv2" data-k="data"></dl>')}
+          ${section('items', '판정 <small>판정 엔진 결과 아님</small>', `<div class="ext-note"><b>판정 없음(외부 항적)</b><p>ABFAP 항적은 판정 결과가 아니므로 판정 단계(정상·주의·경고·비상)를 붙이지 않고 위치·속도만 표시함. 마지막 유효 수신 후 ${(TMS.staleMs() / 1000).toFixed(0)}초가 지나면 정보 없음으로 바꾸고 위치를 숨김.</p></div>`)}
+          ${section('paths', 'ABFAP 전송 정보 <small>수신기 X-API-Key 검증</small>', '<dl class="kv2" data-k="abfap"></dl>')}
+          <p class="d-hint">기체 키는 callsign(없으면 model)임. ABFAP 항적에는 ICAO 24비트 주소가 없음. 판정이 없는 외부 항적이므로 병행 운용 판단 기록은 두지 않음.</p>
+        </div>
+        <button type="button" class="d-foot" data-act="events">이 항적의 이력 보기 <span>↗</span></button>`;
+      return;
+    }
     root.innerHTML = `<div class="d-head">
         <div class="eyebrow">${ac.virtual ? '가상기체' : '실증기 · 유인'}</div>
         <h1>${ac.id}</h1>
@@ -337,8 +441,20 @@
   }
 
   function updateDetail() {
-    if (S.selected !== forId || !$('#detail').firstChild) buildDetail();
+    if (S.selected !== forId || !$('#detail').firstChild || (builtMissing && acOf(forId))) buildDetail();
     const id = forId;
+    if (!id && CTL) {
+      const c = counts();
+      const cs = ctlStatus();
+      const [cls, txt] = CTL_PHASE[cs.phase] || CTL_PHASE.none;
+      const by = k => M.AIRCRAFT.filter(a => a.source === k).length;
+      q('ov-n').textContent = M.AIRCRAFT.length;
+      q('ov-status').innerHTML = `<span class="st-text st-text--${cls === 'ok' ? 'normal' : cls === 'bad' ? 'emergency' : cls === 'warn' ? 'caution' : 'nodata'}">ABFAP 수신기 ${txt}</span>`;
+      q('ov-meta').innerHTML = `X-Plane <b>${by('xplane')}</b> · ABSim <b>${by('absim')}</b> · 재생 <b>${by('replay')}</b><br>정보 없음 기준 <b>${(TMS.staleMs() / 1000).toFixed(0)}초</b>(제어 모드)`;
+      q('ov-body').innerHTML = kv(ST_KEYS.map(k => [ST[k].label, `<span class="${c[k] && k === 'nodata' ? 'st-text--nodata' : ''}">${c[k]}건</span>`]))
+        + kv([['마지막 스냅샷', cs.snap ? `seq ${cs.snap.seq} · ${kstMs(cs.snap.t)} KST` : '—'], ['미확인 경보', `${S.unacked().length}건`]]);
+      return;
+    }
     if (!id) {
       const c = counts();
       const bad = S.feedStale();
@@ -351,11 +467,13 @@
     const r = S.recs[id];
     const st = S.displayStatus(id);
     const fresh = st !== 'nodata';
+    if (!acOf(id) || builtMissing) return;
+    if (CTL) { updateDetailControl(id, r, st, fresh); return; }
     q('follow').classList.toggle('is-on', S.follow);
     q('status').innerHTML = `${stText(st)}${fresh && st !== 'normal' && r.cause ? `<span class="d-cause">${r.cause}</span>` : ''}`;
     q('meta').innerHTML = !r ? '수신 이력 없음'
-      : fresh ? `판정 시각 <b class="mono">${kstMs(r.t)}</b> KST · ${F.age(S.now - r.t)} 수신<br>ID <b>${id}</b> · ${byId[id].type}`
-        : `마지막 유효 수신 <b class="mono">${kstMs(r.t)}</b> KST · <span class="st-text--nodata">${ago(S.now - r.t)} 경과</span><br>ID <b>${id}</b> · ${byId[id].type}`;
+      : fresh ? `판정 시각 <b class="mono">${kstMs(r.t)}</b> KST · ${F.age(S.now - r.t)} 수신<br>ID <b>${id}</b> · ${acOf(id).type}`
+        : `마지막 유효 수신 <b class="mono">${kstMs(r.t)}</b> KST · <span class="st-text--nodata">${ago(S.now - r.t)} 경과</span><br>ID <b>${id}</b> · ${acOf(id).type}`;
     const pa = r && fresh ? r.paths : null;
     q('pathicon').innerHTML = `<svg viewBox="0 0 20 20" class="halves"><path class="${pa && pa.ADSB.state === 'ok' ? 'on' : 'off'}" d="M10 2a8 8 0 0 0 0 16z"/><path class="${pa && tlmOk(r) ? 'on' : 'off'}" d="M10 2a8 8 0 0 1 0 16z"/></svg>
       <span>ADS-B ${pa ? (pa.ADSB.state === 'ok' ? '수신' : '두절') : '—'}${tlmLinks(r).map(l => ` · ${l.label} ${pa ? linkStateText(l) : '—'}`).join('')}${pa && r.fusion.flag === 'mismatch' ? ' · <b class="st-text--emergency">불일치</b>' : ''}</span>`;
@@ -422,6 +540,43 @@
     }
   }
 
+  // 제어 모드 기체 상세: ABFAP 값(단위 변환)과 전송 정보. 정보 없음이면 값을 숨김
+  function updateDetailControl(id, r, st, fresh) {
+    const ac = acOf(id);
+    const x = r && r.ext;
+    const f = r && fresh ? r.fused : null;
+    const dash = '—';
+    const esc = v => (v == null || v === '' ? dash : F.esc(v));
+    const deg1 = v => (v == null ? dash : `${v.toFixed(1)}°`);
+    q('follow').classList.toggle('is-on', S.follow);
+    q('status').innerHTML = `${stText(st)}${ac.replay ? '<span class="d-cause">재생 항적 · 실시간 기체 아님</span>' : ''}`;
+    q('meta').innerHTML = !r ? '수신 이력 없음'
+      : `${fresh ? '수신기 수신' : '마지막 유효 수신'} <b class="mono">${kstMs(r.t)}</b> KST · ${fresh ? F.age(S.now - r.t) : `<span class="st-text--nodata">${ago(S.now - r.t)} 경과</span>`}<br>기체 키 <b>${F.esc(id)}</b> (${x.keyFrom === 'callsign' ? 'callsign' : 'model'}) · ${ac.type}`;
+    q('pathicon').innerHTML = `${srcTag(ac)}${f && x.udp_connected === false ? ' <span class="st-text--caution">ABSim 텔레메트리 미수신</span>' : ''}`;
+    const sub = (v, u) => (v == null ? '' : ` <small class="muted">${Math.round(v)} ${u}</small>`);
+    q('data').innerHTML = r ? kv([
+      ['고도(MSL)', f ? `${fmtM(f.alt_m)}${sub(f.alt_ft, 'ft')}` : dash],
+      ['대지속도', f ? `${fmtMps(f.gs_ms)}${sub(f.gs_kt, 'kt')}` : dash],
+      ['진대기속도', f ? `${fmtMps(f.tas_ms)}${sub(f.tas_kt, 'kt')}` : dash],
+      [x.source === 'absim' ? '교정대기속도' : '지시대기속도', f ? (x.source === 'absim' ? `${fmtMps(f.cas_ms)}${sub(f.cas_kt, 'kt')}` : `${fmtMps(f.ias_ms)}${sub(f.ias_kt, 'kt')}`) : dash],
+      ['방위', f ? fmtDeg(f.hdg) : dash],
+      ['피치 · 롤', f ? `${deg1(f.pitch)} · ${deg1(f.roll)}` : dash],
+      ['위치', f ? `${f.lat.toFixed(5)}°,<br>${f.lon.toFixed(5)}°` : dash],
+      ['측정 시각', f && x.ts_ms != null ? `<span class="mono">${kstMs(x.ts_ms)}</span> KST` : dash],
+      ['마지막 수신', fresh ? ago(S.now - r.t) : `<span class="st-text--nodata">${ago(S.now - r.t)} 경과</span>`],
+    ]) : '<p class="muted">수신 이력 없음</p>';
+    const sent = x ? Date.parse(x.sent_at) : NaN;
+    q('abfap').innerHTML = r ? kv([
+      ['출처(source)', `${SRC[x.source].label} <small class="muted">${SRC[x.source].note}</small>`],
+      ['callsign', esc(x.callsign)], ['model', esc(x.model)], ['gufi_id', `<span class="mono">${esc(x.gufi_id)}</span>`],
+      ['udp_connected', x.udp_connected == null ? dash : x.udp_connected ? '연결' : '<span class="st-text--caution">끊김(3초 넘게 미수신)</span>'],
+      ['ABFAP 세션', x.session_id == null ? dash : `<span class="mono">${x.session_id}</span>`],
+      ['전송 순번(seq)', `<span class="mono">${x.seq}</span>`],
+      ['전송 시각(sent_at)', isFinite(sent) ? `<span class="mono">${kstMs(sent)}</span> KST` : dash],
+      ['키 검증', '<span class="st-text--normal">수신기 통과</span> <small class="muted">(X-API-Key · 메시지 서명 없음)</small>'],
+    ]) : '';
+  }
+
   // ---------- 경보·이벤트 ----------
   let evFilter = 'all';
   let evKey = '';
@@ -471,6 +626,40 @@
     const agree = ops.filter(o => o.sys === o.op).length;
     const okTxt = s => (bad ? '<span class="muted">정보 없음</span>' : s === 'ok' ? '<span class="st-text--normal">정상</span>' : '<span class="st-text--emergency">이상</span>');
     const card = (title, rows, extra = '') => `<section class="sec is-open"><div class="sec__head sec__head--static">${title}</div><div class="sec__body"><dl class="kv2">${kv(rows)}</dl>${extra}</div></section>`;
+    if (CTL) {
+      const cs = ctlStatus();
+      const [cls, txt] = CTL_PHASE[cs.phase] || CTL_PHASE.none;
+      const tone = { ok: 'normal', bad: 'emergency', warn: 'caution', nodata: 'nodata' }[cls];
+      const st = cs.stats || {};
+      const n = cs.snap ? cs.snap.counts : null;
+      $('#system').innerHTML =
+        card('ABFAP 수신', [
+          ['수신기', `<span class="st-text--${tone}">${txt}</span>`],
+          ['조회 주소', `<span class="mono">${F.esc(C.CONTROL_SNAPSHOT_URL)}</span> <small class="muted">같은 출처</small>`],
+          ['마지막 조회 성공', cs.lastOk ? `<span class="mono">${kstMs(cs.lastOk)}</span>` : '—'],
+          ['마지막 오류', cs.err ? F.esc(cs.err) : '—'],
+          ['수신 키', cs.keyConfigured == null ? '—' : cs.keyConfigured ? '설정됨' : '<span class="st-text--caution">미설정(송신 거절)</span>'],
+          ['마지막 스냅샷', cs.snap ? `seq <span class="mono">${cs.snap.seq}</span> · <span class="mono">${kstMs(cs.snap.t)}</span>` : '—'],
+          ['스냅샷 항적', n ? `X-Plane ${n.xplane} · ABSim ${n.absim} · 재생 ${n.replay}` : '—'],
+          ['받음 / 중복 / 역순', `${st.accepted ?? '—'} / ${st.duplicate ?? '—'} / ${st.out_of_order ?? '—'}`],
+          ['재시작 수용', `${st.restart ?? '—'}`],
+          ['키 거절 / 빈도 제한', `${st.auth_rejected ?? '—'} / ${st.rate_limited ?? '—'}`],
+          ['형식 오류 · 버린 항적', `${st.bad_request ?? '—'} · ${st.tracks_dropped ?? '—'}`],
+        ], '<p class="hint">수신기는 최신 스냅샷 1건만 메모리에 둠. 재생은 이 창이 연 뒤 받은 값(최근 30분)으로만 함.</p>')
+        + card('연동 화면', [
+          ['이 창', `${TMS.VIEWS[S.view].label}${S.screenNo ? ` · 화면 ${S.screenNo}/${S.screenCount}` : ''}`],
+          ...peers.map(([, p]) => ['연동 창', `${p.view && TMS.VIEWS[p.view] ? TMS.VIEWS[p.view].label : '확인 중'}${p.screenNo ? ` · 화면 ${p.screenNo}` : ''} · ${F.age(Date.now() - p.seen)} 응답`]),
+        ], peers.length ? '<p class="hint">제어 모드 창끼리만 연동됨(데모 창과 분리).</p>' : '<p class="hint">연동된 다른 제어 모드 창 없음</p>')
+        + card('표시 규칙', [
+          ['판정', '판정 없음(외부 항적)'],
+          ['정보 없음 기준', `${(TMS.staleMs() / 1000).toFixed(0)}초 <small class="muted">(제어 모드, 전송 주기 1초)</small>`],
+          ['목록에서 내림', `${C.CONTROL_DROP_SEC}초 미수신`],
+          ['기체 키', 'callsign(없으면 model)'],
+          ['단위', '고도 m · 속도 m/s · 시각 KST'],
+          ['확인 필요 상태', C.ACK_REQUIRED.filter(k => k === 'nodata').map(k => ST[k].label).join(', ')],
+        ]);
+      return;
+    }
     $('#system').innerHTML =
       card('데이터 연결', [
         ['판정 결과 수신', bad ? '<span class="st-text--emergency">두절</span>' : '<span class="st-text--normal">정상</span>'],
@@ -512,14 +701,14 @@
         ...M.PROCS.map(p => ['절차 (가상)', `<span class="mono">${p.id} v${p.ver}</span>`]),
       ])
       + card('표시 규칙', [
-        ['정보 없음 기준', `${(C.STALE_MS / 1000).toFixed(1)}초 (초기값)`], ['항적 길이', `${C.TRAIL_SEC}초`],
+        ['정보 없음 기준', `${(TMS.staleMs() / 1000).toFixed(1)}초 (초기값)`], ['항적 길이', `${C.TRAIL_SEC}초`],
         ['확인 필요 상태', C.ACK_REQUIRED.map(k => ST[k].label).join(', ')],
       ])
       + card('병행 운용 기록', [['기록', `${ops.length}건`], ['일치 / 불일치', `${agree} / ${ops.length - agree}`]], '<p class="hint">일치율 평가는 기록 서비스에서 수행함.</p>');
   }
 
   // ---------- 버티포트 운항일정 ----------
-  let schedVp = M.VERTIPORTS[0].id;
+  let schedVp = M.VERTIPORTS.length ? M.VERTIPORTS[0].id : null;
   let schedAt = 0;
   let schedSel;
   function bindSchedule() {
@@ -538,6 +727,18 @@
     return `<span class="t-diff t-diff--${d > 0 ? 'late' : 'early'}">${d > 0 ? '+' : ''}${d}분</span>`;
   }
   function updateSchedule() {
+    if (CTL) {
+      // 제어 모드: ABFAP 항적에는 운항 배정·버티포트 일정이 없음
+      if ($('#arr-body').dataset.ctl) return;
+      const note = '<p class="muted pad">제어 모드: ABFAP 항적에는 운항 배정·버티포트 일정이 없어 표시하지 않음.</p>';
+      $('#arr-body').innerHTML = note;
+      $('#dep-body').innerHTML = note;
+      $('#arr-body').dataset.ctl = '1';
+      $('#arr-count').textContent = '0';
+      $('#dep-count').textContent = '0';
+      $('#sched-sum').innerHTML = '';
+      return;
+    }
     document.querySelectorAll('#sched-vp [data-vp]').forEach(b => b.classList.toggle('is-on', b.dataset.vp === schedVp));
     if (Date.now() - schedAt < 1000 && schedSel === S.selected) return;
     schedAt = Date.now();
@@ -610,11 +811,14 @@
     const hideMs = (C.ALERT_STRIP_HIDE_SEC || 300) * 1000;
     const un = S.unacked().filter(ev => S.now - ev.t < hideMs);
     const bad = S.feedStale() && S.mode === 'live';
-    const key = `${S.evVersion}|${un.map(ev => ev.id).join(',')}|${bad}`;
+    const key = `${S.evVersion}|${un.map(ev => ev.id).join(',')}|${bad}|${CTL ? ctlStatus().phase : ''}`;
     if (el.dataset.key === key) return;
     el.dataset.key = key;
     const top = un.slice().sort((a, b) => ST[a.to].rank - ST[b.to].rank || b.t - a.t).slice(0, 3);
-    el.innerHTML = (bad ? '<div class="alert alert--feed"><b>판정 결과 수신 두절</b><span>모든 기체를 정보 없음으로 표시함. 화면의 값은 최신이 아님.</span></div>' : '')
+    const feedMsg = CTL
+      ? `<div class="alert alert--feed"><b>${({ none: 'ABFAP 수신기 없음', connecting: 'ABFAP 수신기 연결 중' })[ctlStatus().phase] || 'ABFAP 수신기 연결 끊김'}</b><span>모든 항적을 정보 없음으로 표시함. 화면의 값은 최신이 아님.</span></div>`
+      : '<div class="alert alert--feed"><b>판정 결과 수신 두절</b><span>모든 기체를 정보 없음으로 표시함. 화면의 값은 최신이 아님.</span></div>';
+    el.innerHTML = (bad ? feedMsg : '')
       + top.map(ev => `<div class="alert alert--${ev.to}" data-ac="${ev.ac}"><b>${ST[ev.to].label}</b><span>${ev.ac}${ev.virtual ? ' (가상)' : ''} · ${F.esc(ev.cause || '')} · ${kst(ev.t)}</span><button type="button" class="btn btn--sm btn--ack" data-ack="${ev.id}">확인</button></div>`).join('')
       + (un.length > 3 ? `<div class="alert alert--more">미확인 ${un.length - 3}건 더 있음</div>` : '');
   }
@@ -624,6 +828,7 @@
     return `<div class="gauge gauge--${cls}"><svg viewBox="0 0 32 32"><circle class="g-bg" cx="16" cy="16" r="${r}"/><circle class="g-fg" cx="16" cy="16" r="${r}" stroke-dasharray="${((pct || 0) / 100 * c).toFixed(1)} ${c.toFixed(1)}"/><text x="16" y="19.5">${label}</text></svg><b>${pct == null ? '—' : `${pct}%`}</b></div>`;
   }
   function updateGauges() {
+    if (CTL) { $('#gauges').innerHTML = ''; return; } // 제어 모드: 수신 경로(ADS-B·텔레메트리) 비율 없음
     const fresh = M.AIRCRAFT.filter(a => S.isFresh(a.id));
     const share = ok => (S.feedStale() ? null : Math.round(fresh.filter(a => ok(S.recs[a.id])).length / M.AIRCRAFT.length * 100));
     const el = $('#gauges');

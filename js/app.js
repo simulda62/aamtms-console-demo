@@ -7,6 +7,7 @@
   const mm = { count: 3, screens: null, assign: [], note: '' };
   function urlFor(view, i, n) {
     const p = new URLSearchParams({ view, screen: String(i + 1), of: String(n), lang: TMS.i18n.lang });
+    if (TMS.CONTROL) p.set('mode', 'control');
     return `${location.pathname}?${p}`;
   }
   function featuresFor(scr) {
@@ -88,7 +89,7 @@
     modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; });
     $('#mm-close-all').addEventListener('click', () => {
       S.closeAll();
-      location.href = `${location.pathname}?view=main&lang=${TMS.i18n.lang}`;
+      location.href = `${location.pathname}?view=main&lang=${TMS.i18n.lang}${TMS.CONTROL ? '&mode=control' : ''}`;
     });
   }
 
@@ -130,6 +131,19 @@
       ['#demo-feed', '#demo-loss', '#demo-sig', '#demo-clock-att', '#demo-clock-norep'].forEach(s => { $(s).disabled = !live; });
       if (S.selected && document.activeElement !== sel && sel.dataset.last !== S.selected) { sel.value = S.selected; sel.dataset.last = S.selected; }
     });
+  }
+
+  // ---------- 제어 모드 ----------
+  // 켜면 데모 각본 대신 ABFAP 항적 수신기의 값을 보이고, 데모 창과 연동 채널을 나누어 따로 돌아감(js/abfap_source.js)
+  function initControl() {
+    const btn = $('#btn-control');
+    btn.classList.toggle('is-on', TMS.CONTROL);
+    btn.setAttribute('aria-pressed', TMS.CONTROL ? 'true' : 'false');
+    btn.title = TMS.CONTROL ? '데모 각본으로 돌아감(연동 창 모두)' : 'ABFAP 항적 수신으로 전환함(연동 창 모두)';
+    btn.addEventListener('click', () => S.switchSource(!TMS.CONTROL));
+    document.body.classList.toggle('is-control', TMS.CONTROL);
+    // 제어 모드에서는 데모 상황 주입을 쓰지 않음
+    if (TMS.CONTROL) $('#btn-demo').hidden = true;
   }
 
   // ---------- 단축키 ----------
@@ -174,7 +188,7 @@
     if (S.view === lastView && closed === lastAssets) return;
     lastView = S.view;
     lastAssets = closed;
-    document.title = TMS.i18n.t(`AAM TMS 관제 · ${TMS.VIEWS[S.view].label} (데모)`);
+    document.title = TMS.i18n.t(`AAM TMS 관제 · ${TMS.VIEWS[S.view].label} (${TMS.CONTROL ? '제어 모드' : '데모'})`);
     const pane = $('#pane-map');
     if (pane && pane.offsetParent !== null) TMS.mapView.ensure($('#map'));
   }
@@ -190,6 +204,7 @@
     S.on(() => { TMS.panels.update(); syncMap(); TMS.mapView.update(); TMS.ontology.update(); });
     initMulti();
     initDemo();
+    initControl();
     initKeys();
     $('#btn-fullscreen').addEventListener('click', () => {
       if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {});

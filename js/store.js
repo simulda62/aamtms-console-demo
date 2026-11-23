@@ -202,6 +202,13 @@
   // 기준 위치 변경 등 다시 불러와야 하는 설정을 연동 창 전체에 적용함
   S.reloadAll = () => { send({ type: 'reload' }); location.reload(); };
   S.setFollow = on => { S.follow = on; emit(); };
+  // 데이터 공급원 전환(데모 각본 ↔ 제어 모드). 주소(?mode=control)로 정하며 연동 창 전체가 함께 바꿈
+  S.switchSource = function (control, fromPeer) {
+    if (!fromPeer) send({ type: 'source', control });
+    const p = new URLSearchParams(location.search);
+    if (control) p.set('mode', 'control'); else p.delete('mode');
+    location.search = p.toString();
+  };
   S.pauseAt = t => {
     const now = Date.now();
     t = Math.max(now - C.REPLAY_WINDOW_SEC * 1000, Math.min(t, now));
@@ -246,6 +253,7 @@
       case 'replay': applyReplay(m.mode, m.replay, true); break;
       case 'ov': S.setOverrides(m.ov, true); break;
       case 'reload': location.reload(); break;
+      case 'source': S.switchSource(!!m.control, true); break;
       case 'close-all': window.close(); setTimeout(() => { document.body.classList.add('is-closed'); }, 200); break;
       default: break;
     }
