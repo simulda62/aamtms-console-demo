@@ -180,8 +180,10 @@
     TEL.filter(d => d.idx).forEach(d => telConvert(tel, source, d).forEach(r => { any.add(r.n); if (r.raw !== 0) seen.add(r.n); }));
     return seen.size ? seen : any.has(1) ? new Set([1]) : new Set();
   }
-  const telFmt = (d, v) => (typeof v === 'number' ? v.toLocaleString('en-US', { minimumFractionDigits: d.digits, maximumFractionDigits: d.digits }) : String(v));
-  const telRaw = v => (typeof v === 'number' ? v.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(v));
+  // 표시 자릿수로 반올림한 값이 0이면 부호를 떼어 "-0"으로 보이지 않게 함
+  const noNegZero = (v, digits) => { const r = Number(v.toFixed(digits)); return r === 0 ? 0 : r; };
+  const telFmt = (d, v) => (typeof v === 'number' ? noNegZero(v, d.digits).toLocaleString('en-US', { minimumFractionDigits: d.digits, maximumFractionDigits: d.digits }) : String(v));
+  const telRaw = v => (typeof v === 'number' ? noNegZero(v, 2).toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(v));
   // 원천 위치(그룹.필드, absim은 필드) → 공통 파라미터. 원본 표에서 대응 여부를 보이는 데 씀
   const TEL_FIELD = {};
   TEL.forEach(d => {
