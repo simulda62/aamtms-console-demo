@@ -62,6 +62,21 @@
     return a;
   }
 
+  // X-Plane 항목 유지(2026-11-24 사용자 결정): 한 번 받은 X-Plane 기체는 스냅샷에서 빠져도 목록에서 내리지 않고
+  // 정보 없음으로 남김. 이 창에서 본 X-Plane 기체 키는 브라우저 저장소에 두어 새로 열어도 항목을 다시 만듦.
+  const XP_KEEP_KEY = 'aamtms.control.xplane';
+  const xpKept = {};
+  try {
+    (JSON.parse(localStorage.getItem(XP_KEEP_KEY) || '[]') || []).forEach(k => {
+      if (k && typeof k.id === 'string') { xpKept[k.id] = k; ensureAc(k.id, { source: 'xplane', callsign: k.callsign || null }); }
+    });
+  } catch (e) { /* 저장소를 못 쓰면 이번 창에서만 유지 */ }
+  function keepXplane(id, tr) {
+    if (xpKept[id] && xpKept[id].callsign === (tr.callsign || null)) return;
+    xpKept[id] = { id, callsign: tr.callsign || null };
+    try { localStorage.setItem(XP_KEEP_KEY, JSON.stringify(Object.values(xpKept))); } catch (e) { /* 무시 */ }
+  }
+
   function toRecord(tr, id, t, snap) {
     const alt_ft = num(tr.alt_ft), gs_kt = num(tr.speed_kt), hdg = num(tr.heading);
     const tsMs = num(tr.ts) == null ? null : tr.ts * 1000;
@@ -106,6 +121,7 @@
       let id = safeKey(raw);
       if (used[id]) id = `${id.slice(0, 29)}~${++used[id]}`; else used[id] = 1;
       ensureAc(id, tr);
+      if (tr.source === 'xplane') keepXplane(id, tr);
       const r = toRecord(tr, id, tRx, snap);
       snap.recs.push(r);
       snap.counts[tr.source]++;
@@ -187,6 +203,7 @@
     const dropBefore = t - C.CONTROL_DROP_SEC * 1000;
     for (let i = AIRCRAFT.length - 1; i >= 0; i--) {
       const id = AIRCRAFT[i].id;
+      if (AIRCRAFT[i].source === 'xplane') continue; // X-Plane 항목은 내리지 않음(정보 없음으로 유지)
       if (lastIn[id] != null && lastIn[id] < dropBefore) {
         AIRCRAFT.splice(i, 1);
         delete byId[id];
